@@ -1,0 +1,73 @@
+---
+const experiences = [
+  {
+    company: "BlockApex",
+    role: "Senior Software Engineer & Technical Lead",
+    period: "Mar 2023 -- Present",
+    location: "Karachi, PK",
+    description: [
+      "Architected Bulwark, a Solana security auditing engine, utilizing a hybrid monorepo (NestJS/Rust).",
+      "Designed the backend for Midl, a P2P crypto-fiat bridge, optimizing for 10,000+ concurrent users.",
+      "Developed Aasan Bridge, a cross-chain bridging solution utilizing LayerZero OFT.",
+      "Rescued the halted BlockX network by diagnosing consensus failures.",
+      "Built backend for high-traffic dApps ensuring 100% uptime via Redis caching.",
+      "Streamlined DevOps, reducing deployment time by 40%."
+    ]
+  },
+  {
+    company: "Xord",
+    role: "Full Stack Blockchain Engineer",
+    period: "May 2022 -- Mar 2023",
+    location: "Karachi, PK",
+    description: [
+      "Solely architected Script TV, a Watch-to-Earn platform on EVM.",
+      "Implemented secure wallet integration for Enterprise Ethereum applications.",
+      "Optimized database queries for a blockchain explorer, reducing latency by 40%."
+    ]
+  },
+  {
+    company: "Tezeract",
+    role: "Co-Founder & CTO",
+    period: "Dec 2020 -- May 2022",
+    location: "Karachi, PK",
+    description: [
+      "Led a team of 4 engineers in building 5+ AI-centric SaaS products.",
+      "Developed Duckends, a touchless gesture-control feedback system.",
+      "Integrated Sabre APIs for an OTA application handling $50k+ monthly transactions."
+    ]
+  },
+  {
+    company: "Xehen",
+    role: "Lead MERN Stack Engineer",
+    period: "May 2020 -- Dec 2020",
+    location: "Karachi, PK",
+    description: [
+      "Managed a 3-person MERN stack team, leading architectural design for 5,000 active users."
+    ]
+  }
+];
+---
+
+<section id="experience" class="py-20">
+  <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-12">Experience</h3>
+  <div class="space-y-12">
+    {experiences.map((exp) => (
+      <div class="group relative border-l-2 border-gray-200 pl-8 pb-2 hover:border-primary transition-colors duration-300">
+        <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-gray-200 group-hover:bg-primary transition-colors duration-300"></div>
+        <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-2">
+          <h4 class="text-xl font-semibold text-secondary">{exp.company}</h4>
+          <span class="text-sm text-gray-500 font-mono">{exp.period}</span>
+        </div>
+        <div class="mb-4">
+          <span class="text-lg text-gray-700 font-medium">{exp.role}</span>
+          <span class="text-gray-500 text-sm ml-2">• {exp.location}</span>
+        </div>
+        <ul class="space-y-2 text-gray-600 list-disc list-inside">
+          {exp.description.map((item) => (
+            <li class="leading-relaxed text-sm">{item}</li>
+          ))}
+        </ul>
+      </div>
+    ))}
+  </div>
+</section>

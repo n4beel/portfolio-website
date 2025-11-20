@@ -1,0 +1,64 @@
+---
+import { ArrowUpRight } from 'lucide-react';
+
+const projects = [
+  {
+    title: "Bulwark",
+    description: "Solana security auditing engine using a hybrid monorepo (NestJS/Rust). Engineered static analysis tool for Anchor programs.",
+    tags: ["Rust", "NestJS", "Solana", "Security"],
+    link: "#"
+  },
+  {
+    title: "Midl",
+    description: "P2P crypto-fiat bridge optimized for 10,000+ concurrent users. Implemented idempotent transaction processing.",
+    tags: ["Backend", "P2P", "FinTech", "High Scale"],
+    link: "#"
+  },
+  {
+    title: "Aasan Bridge",
+    description: "Cross-chain bridging solution utilizing LayerZero OFT for secure asset transfers between EVM and Solana.",
+    tags: ["LayerZero", "Cross-chain", "EVM", "Solana"],
+    link: "#"
+  },
+  {
+    title: "BlockX Network Rescue",
+    description: "Diagnosed consensus failures and resolved synchronization deadlocks to restore network liveness for BlockX.",
+    tags: ["Blockchain", "Consensus", "Debugging"],
+    link: "#"
+  },
+  {
+    title: "Script TV",
+    description: "Watch-to-Earn platform on EVM. Designed tokenomics contracts and high-throughput indexing backend.",
+    tags: ["EVM", "Smart Contracts", "Web3"],
+    link: "#"
+  },
+  {
+    title: "Duckends",
+    description: "Touchless gesture-control feedback system deployed in Dubai Mall kiosks using computer vision.",
+    tags: ["Computer Vision", "AI", "IoT"],
+    link: "#"
+  }
+];
+---
+
+<section id="projects" class="py-20">
+  <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-12">Selected Projects</h3>
+  <div class="grid md:grid-cols-2 gap-8">
+    {projects.map((project) => (
+      <a href={project.link} class="group block p-8 rounded-2xl bg-white border border-gray-100 hover:border-primary/20 hover:shadow-lg transition-all duration-300">
+        <div class="flex justify-between items-start mb-4">
+          <h4 class="text-xl font-bold text-secondary group-hover:text-primary transition-colors">{project.title}</h4>
+          <ArrowUpRight class="text-gray-400 group-hover:text-primary group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform duration-300" size={20} />
+        </div>
+        <p class="text-gray-600 mb-6 leading-relaxed">{project.description}</p>
+        <div class="flex flex-wrap gap-2">
+          {project.tags.map((tag) => (
+            <span class="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-100 rounded-full group-hover:bg-primary/5 group-hover:text-primary transition-colors">
+              {tag}
+            </span>
+          ))}
+        </div>
+      </a>
+    ))}
+  </div>
+</section>

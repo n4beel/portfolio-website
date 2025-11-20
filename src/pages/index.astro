@@ -1,0 +1,24 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import Hero from '../components/Hero.astro';
+import About from '../components/About.astro';
+import Experience from '../components/Experience.astro';
+import Projects from '../components/Projects.astro';
+import Skills from '../components/Skills.astro';
+import Footer from '../components/Footer.astro';
+import Navigation from '../components/Navigation';
+---
+
+<Layout title="Nabeel Ahmed Khan - Senior Backend Architect">
+	<main class="max-w-5xl mx-auto px-6 md:px-12 pt-28">
+		<Navigation client:load />
+		<Header />
+		<Hero />
+		<About />
+		<Projects />
+		<Experience />
+		<Skills />
+		<Footer />
+	</main>
+</Layout>
