@@ -1,0 +1,37 @@
+---
+const education = [
+    {
+        school: "Virtual University of Pakistan",
+        location: "Lahore, PK",
+        degree: "Master of Science in Computer Science",
+        date: "2024 -- 2026",
+    },
+    {
+        school: "University of Karachi (UBIT)",
+        location: "Karachi, PK",
+        degree: "Bachelor of Science in Software Engineering",
+        date: "2017 -- 2021",
+    },
+];
+---
+
+<section id="education" class="mb-16">
+    <h2 class="text-2xl font-semibold text-gray-900 mb-8">Education</h2>
+    <div class="space-y-8">
+        {
+            education.map((edu) => (
+                <div class="relative pl-8 border-l border-gray-200">
+                    <div class="absolute -left-[5px] top-2 w-2.5 h-2.5 rounded-full bg-gray-300 ring-4 ring-white" />
+                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-baseline mb-1">
+                        <h3 class="text-lg font-medium text-gray-900">
+                            {edu.school}
+                        </h3>
+                        <span class="text-sm text-gray-500">{edu.date}</span>
+                    </div>
+                    <div class="text-base text-gray-700 mb-1">{edu.degree}</div>
+                    <div class="text-sm text-gray-500">{edu.location}</div>
+                </div>
+            ))
+        }
+    </div>
+</section>

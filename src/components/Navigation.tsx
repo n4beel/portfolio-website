@@ -10,8 +10,8 @@ const leftNavItems = [
 ];
 
 const rightNavItems = [
-    { name: 'Education', href: '#' },
-    { name: 'Skills', href: '#skills' },
+    { name: 'Education', href: '#education' },
+    { name: 'Achievements', href: '#achievements' },
     { name: 'Contact', href: 'mailto:contact@nabeelkhan.dev' },
 ];
 
@@ -26,7 +26,7 @@ export default function Navigation() {
                 <motion.div
                     layout
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                    className={`flex items-center rounded-lg overflow-hidden h-10 ${isOpen ? 'bg-gray-100 px-1 shadow-sm' : 'bg-white shadow-md'}`}
+                    className={`flex items-center rounded-lg overflow-hidden h-10 gap-1 ${isOpen ? 'bg-gray-100 px-1 shadow-sm' : 'bg-white shadow-md'}`}
                     style={{ minWidth: '40px' }}
                 >
                     <AnimatePresence>
@@ -36,7 +36,7 @@ export default function Navigation() {
                                 animate={{ opacity: 1, width: "auto" }}
                                 exit={{ opacity: 0, width: 0 }}
                                 transition={{ duration: 0.2, delay: 0.1 }}
-                                className="flex items-center overflow-hidden"
+                                className="flex items-center justify-end overflow-hidden min-w-[240px]"
                             >
                                 {leftNavItems.map((item) => (
                                     <a
@@ -53,9 +53,8 @@ export default function Navigation() {
                     </AnimatePresence>
 
                     <motion.button
-                        layout
                         onClick={toggleNav}
-                        className={`w-10 h-10 flex items-center justify-center rounded-md transition-all focus:outline-none z-10 shrink-0 ${isOpen ? 'hover:bg-white hover:shadow-sm mx-1' : 'hover:bg-gray-50'}`}
+                        className={`w-10 h-10 flex items-center justify-center rounded-md focus:outline-none z-10 shrink-0 ${isOpen ? 'hover:bg-white hover:shadow-sm' : 'hover:bg-gray-50'}`}
                         aria-label={isOpen ? "Close Navigation" : "Open Navigation"}
                     >
                         <motion.div
@@ -73,7 +72,7 @@ export default function Navigation() {
                                 animate={{ opacity: 1, width: "auto" }}
                                 exit={{ opacity: 0, width: 0 }}
                                 transition={{ duration: 0.2, delay: 0.1 }}
-                                className="flex items-center overflow-hidden"
+                                className="flex items-center justify-start overflow-hidden min-w-[240px]"
                             >
                                 {rightNavItems.map((item) => (
                                     <a
