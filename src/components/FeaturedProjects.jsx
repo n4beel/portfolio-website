@@ -89,11 +89,10 @@ export default function FeaturedProjects({ allProjects }) {
                             key={catId}
                             type="button"
                             onClick={() => handleCategoryChange(catId)}
-                            className={`rounded-full border px-5 py-2.5 text-sm font-medium transition-all duration-200 ${
-                                isActive
+                            className={`rounded-full border px-5 py-2.5 text-sm font-medium transition-all duration-200 ${isActive
                                     ? "border-primary bg-primary/10 text-primary"
                                     : "border-gray-200 text-gray-500 hover:border-primary/40 hover:text-gray-700"
-                            }`}
+                                }`}
                         >
                             {category.label}
                         </button>

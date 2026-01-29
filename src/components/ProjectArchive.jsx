@@ -104,8 +104,8 @@ export default function ProjectArchive({ projects }) {
                                 type="button"
                                 onClick={() => toggleCategory(categoryId)}
                                 className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${selectedCategory === categoryId
-                                        ? "border-primary bg-primary/10 text-primary"
-                                        : "border-gray-200 text-gray-500 hover:border-primary/40"
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-gray-200 text-gray-500 hover:border-primary/40"
                                     }`}
                             >
                                 {CATEGORIES[categoryId]}
@@ -125,8 +125,8 @@ export default function ProjectArchive({ projects }) {
                                 type="button"
                                 onClick={() => toggleTech(tech)}
                                 className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${selectedTech.includes(tech)
-                                        ? "border-primary bg-primary/10 text-primary"
-                                        : "border-gray-200 text-gray-500 hover:border-primary/40"
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-gray-200 text-gray-500 hover:border-primary/40"
                                     }`}
                             >
                                 {tech}
