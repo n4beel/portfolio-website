@@ -5,69 +5,99 @@ const experiences = [
     role: "Senior Software Engineer & Technical Lead",
     period: "Mar 2023 -- Present",
     location: "Karachi, PK",
-    description: [
-      "Architected Bulwark, a Solana security auditing engine, utilizing a hybrid monorepo (NestJS/Rust).",
-      "Designed the backend for Midl, a P2P crypto-fiat bridge, optimizing for 10,000+ concurrent users.",
-      "Developed Aasan Bridge, a cross-chain bridging solution utilizing LayerZero OFT.",
-      "Rescued the halted BlockX network by diagnosing consensus failures.",
-      "Built backend for high-traffic dApps ensuring 100% uptime via Redis caching.",
-      "Streamlined DevOps, reducing deployment time by 40%."
-    ]
+    description:
+      "Lead Architect for internal security engines and high-scale client infrastructure. I oversee the engineering lifecycle for complex distributed systems, bridging high-concurrency Web2 services (NestJS/Redis) with cryptographic security protocols (Rust). A key initiative involved overhauling the organization's DevOps culture, implementing standardized CI/CD pipelines that reduced deployment latency by 40% across 8 distinct architectures.",
+    metrics: ["Distributed Systems", "40% Faster CI/CD"],
+    tech: ["Rust", "Solana", "NestJS", "AWS"],
   },
   {
     company: "Xord",
     role: "Full Stack Blockchain Engineer",
     period: "May 2022 -- Mar 2023",
     location: "Karachi, PK",
-    description: [
-      "Solely architected Script TV, a Watch-to-Earn platform on EVM.",
-      "Implemented secure wallet integration for Enterprise Ethereum applications.",
-      "Optimized database queries for a blockchain explorer, reducing latency by 40%."
-    ]
+    description:
+      "Architected end-to-end backend infrastructure for decentralized media platforms. My role focused on performance engineering; I optimized complex PostgreSQL aggregation pipelines for a blockchain explorer, achieving a 40% reduction in API query latency. Additionally, I led the design of secure, non-custodial authentication flows for enterprise applications.",
+    metrics: ["40% Latency Reduction", "System Performance"],
+    tech: ["Solidity", "Node.js", "PostgreSQL"],
   },
   {
     company: "Tezeract",
     role: "Co-Founder & CTO",
     period: "Dec 2020 -- May 2022",
     location: "Karachi, PK",
-    description: [
-      "Led a team of 4 engineers in building 5+ AI-centric SaaS products.",
-      "Developed Duckends, a touchless gesture-control feedback system.",
-      "Integrated Sabre APIs for an OTA application handling $50k+ monthly transactions."
-    ]
+    description:
+      "As Co-Founder, I led the engineering strategy and mentored a team of 4 developers to ship AI-driven SaaS products. I engineered critical financial integrations for an OTA platform processing $50k+ in monthly volume and deployed computer vision systems for physical retail kiosks, bridging the gap between software logic and real-world hardware.",
+    metrics: ["Engineering Leadership", "High-Vol Payment Ops"],
+    tech: ["Python", "Computer Vision", "AWS"],
   },
   {
     company: "Xehen",
     role: "Lead MERN Stack Engineer",
     period: "May 2020 -- Dec 2020",
     location: "Karachi, PK",
-    description: [
-      "Managed a 3-person MERN stack team, leading architectural design for 5,000 active users."
-    ]
-  }
+    description:
+      "Led a backend engineering team to establish robust REST API standards and scalable database schemas. My architectural decisions laid the foundation for the platform to scale to 5,000+ active users, ensuring data consistency and query performance during the product's early growth phase.",
+    metrics: ["API Standards", "Scalable Schema Design"],
+    tech: ["MongoDB", "Express", "React", "Node.js"],
+  },
+  {
+    company: "Edgeon Solutions",
+    role: "Frontend Developer",
+    period: "Jun 2019 -- May 2020",
+    location: "Karachi, PK",
+    description:
+      "Focused on high-performance frontend architecture and state management. I collaborated closely with backend teams to design efficient API contracts and data synchronization patterns, ensuring seamless integration between complex user interfaces and server-side logic.",
+    metrics: ["Client-Server Arch", "API Integration"],
+    tech: ["React", "Redux", "JavaScript", "HTML/CSS"],
+  },
 ];
 ---
 
 <section id="experience" class="py-20">
-  <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-12">Experience</h3>
+  <h3
+    class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-12"
+  >
+    Experience
+  </h3>
   <div class="space-y-12">
-    {experiences.map((exp) => (
-      <div class="group relative border-l-2 border-gray-200 pl-8 pb-2 hover:border-primary transition-colors duration-300">
-        <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-gray-200 group-hover:bg-primary transition-colors duration-300"></div>
-        <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-2">
-          <h4 class="text-xl font-semibold text-secondary">{exp.company}</h4>
-          <span class="text-sm text-gray-500 font-mono">{exp.period}</span>
+    {
+      experiences.map((exp) => (
+        <div class="group relative border-l-2 border-gray-200 pl-8 pb-2 hover:border-primary transition-colors duration-300">
+          <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-gray-200 group-hover:bg-primary transition-colors duration-300 ring-4 ring-white" />
+
+          <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-2">
+            <h4 class="text-xl font-bold text-secondary group-hover:text-primary transition-colors">
+              {exp.company}
+            </h4>
+            <span class="text-sm text-gray-500 font-mono">{exp.period}</span>
+          </div>
+
+          <div class="mb-4">
+            <span class="text-lg text-gray-700 font-medium">{exp.role}</span>
+            <span class="text-gray-500 text-sm ml-2">• {exp.location}</span>
+          </div>
+
+          <p class="text-gray-600 mb-4 leading-relaxed max-w-2xl">
+            {exp.description}
+          </p>
+
+          <div class="flex flex-wrap gap-3 mb-4">
+            {exp.metrics.map((metric) => (
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-100">
+                {metric}
+              </span>
+            ))}
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            {exp.tech.map((tech) => (
+              <span class="px-2 py-1 text-xs font-mono text-gray-500 bg-gray-50 border border-gray-100 rounded hover:border-gray-300 transition-colors cursor-default">
+                {tech}
+              </span>
+            ))}
+          </div>
         </div>
-        <div class="mb-4">
-          <span class="text-lg text-gray-700 font-medium">{exp.role}</span>
-          <span class="text-gray-500 text-sm ml-2">• {exp.location}</span>
-        </div>
-        <ul class="space-y-2 text-gray-600 list-disc list-inside">
-          {exp.description.map((item) => (
-            <li class="leading-relaxed text-sm">{item}</li>
-          ))}
-        </ul>
-      </div>
-    ))}
+      ))
+    }
   </div>
 </section>

@@ -1,0 +1,658 @@
+[
+    {
+        "slug": "bulwark-audit-platform",
+        "project_name": "Bulwark",
+        "category": "security",
+        "is_featured": false,
+        "project_tagline": "The first automated auditor for Solana that combines Rust-native AST parsing with encrypted on-chain reputation.",
+        "domain_context": "Web3 Security / Smart Contract Auditing",
+        "tech_stack": [
+            "Rust (Syn, Tokio)",
+            "NestJS",
+            "Anchor Framework",
+            "Arcium (MPC Encryption)",
+            "OpenAI GPT-4o",
+            "MongoDB",
+            "Redux Toolkit"
+        ],
+        "project_description": "Manual audits cannot keep pace with the Solana ecosystem's explosive growth. Bulwark fills this gap as an automated 'Pre-Audit' platform. Unlike standard linters that use simple regex, Bulwark runs a custom Rust engine to parse the full Abstract Syntax Tree (AST) of Anchor programs. It identifies 23+ complex attack vectors (like missing PDA seeds or CPI privilege escalation), estimates the audit cost based on code complexity, and cryptographically commits the results to the Solana blockchain using Arcium's Multi-Party Computation (MPC) to ensure privacy.",
+        "architecture_overview": "A hybrid tri-layer system: A high-performance Rust binary for static analysis, a NestJS orchestration layer for managing GitHub workspaces and AI agents, and a Solana program for encrypted, immutable record-keeping.",
+        "key_challenges": [
+            {
+                "focus": "The Pivot: Regex vs. AST",
+                "challenge": "We initially built the analyzer in Node.js using Regex, but it failed catastrophically on Anchor's heavy use of Rust macros (e.g., `#[derive(Accounts)]`). We faced a 40%+ false positive rate because Regex could not understand the semantic relationship between nested structs and instruction handlers.",
+                "solution": "We scrapped the Node.js engine and rewrote the core in Rust using the `syn` crate. We implemented a Visitor Pattern to traverse the raw Abstract Syntax Tree. This allowed us to semantically parse macro expansions and control flow, dropping false positives to near zero and enabling deep dependency graph analysis.",
+                "evidence": "analyzer/src/visitor.rs"
+            },
+            {
+                "focus": "Encrypted On-Chain Storage",
+                "challenge": "We needed to prove an audit happened without leaking the vulnerability report publicly on-chain. Standard encryption wasn't enough; we needed a way to verify the pricing model publicly while keeping the specific commit hash private.",
+                "solution": "Integrated Arcium's RescueCipher (MPC). The NestJS backend derives a shared secret via x25519 key exchange and encrypts the commit hash off-chain. The Solana program then stores this encrypted blob. This allows public verification of the 'Audit Certificate' without revealing the proprietary code data.",
+                "evidence": "arcium-storage.service.ts"
+            },
+            {
+                "focus": "Hybrid Orchestration",
+                "challenge": "Coordinating three disparate runtimes (Rust binary, Node.js backend, AI API) created race conditions. If the Rust analysis finished before the AI, or if the repository was too large, the HTTP request would timeout, leaving the workspace in a zombie state.",
+                "solution": "Designed a 'Shared Workspace' architecture. The NestJS backend handles the git cloning and file staging, then invokes the Rust binary via a local HTTP interface (`/augment`) with a strict `RUST_ANALYZER_TIMEOUT`. We used `tokio::join!` in Rust to parallelize the AI and AST threads, ensuring the entire analysis pipeline completes under 30 seconds for 95% of repos.",
+                "evidence": "static-analysis.service.ts"
+            },
+            {
+                "focus": "Complexity-to-Cost Algorithm",
+                "challenge": "Translating abstract 'Cyclomatic Complexity' scores into a dollar value for a client is difficult. Linear pricing models failed because audit difficulty scales exponentially with code entanglement, not line count.",
+                "solution": "Developed a piecewise linear interpolation engine. We mapped 5 historical data points (Median Complexity vs. Audit Days) and applied a 'Phi-Weighted' efficiency factor (0.8) to account for multi-auditor parallelization, resulting in a defensible, data-driven quote.",
+                "evidence": "risk-scoring-engine.ts"
+            }
+        ]
+    },
+    {
+        "slug": "nxellent-security-platform",
+        "project_name": "Nxellent",
+        "category": "security",
+        "is_featured": false,
+        "project_tagline": "A full-stack Web3 security platform that correlates Smart Contract risks with Frontend vulnerabilities.",
+        "domain_context": "DevSecOps / Web3 Infrastructure",
+        "tech_stack": [
+            "NestJS",
+            "Docker (Ephemeral Containers)",
+            "BullMQ / Redis",
+            "Semgrep",
+            "Solana Web3.js",
+            "Server-Sent Events (SSE)",
+            "MongoDB"
+        ],
+        "project_description": "Most Web3 hacks don't happen in the smart contract—they happen in the frontend (e.g., compromised NPM packages or DNS hijacks). Nxellent is a comprehensive auditing platform that analyzes the *entire* dApp stack. It combines on-chain analysis (Solana program authorities) with off-chain scanning (Next.js/React vulnerabilities) to generate a unified 'Shield Score.' It provides two distinct dashboards: a detailed technical view for Founders to fix bugs, and a high-level risk summary for Investors doing due diligence.",
+        "architecture_overview": "An event-driven distributed system where a NestJS API orchestrates ephemeral, security-hardened Docker containers via BullMQ to execute untrusted code scans safely.",
+        "key_challenges": [
+            {
+                "focus": "Ephemeral Sandboxing",
+                "challenge": "To audit a project, we must run `npm install` and build scripts on untrusted code. Running this on the main server is a massive security risk (RCE attacks) and resource hog.",
+                "solution": "Architected an ephemeral container lifecycle. The worker spawns a security-hardened Docker container (dropped Linux capabilities, `no-new-privileges`) for each job. The container mounts the code as a temporary volume, executes the scan, and is immediately destroyed upon completion, ensuring total isolation and zero resource leakage.",
+                "evidence": "worker.ts / docker-compose.vm.yml"
+            },
+            {
+                "focus": "Distributed Job Queues",
+                "challenge": "Security scans are CPU-intensive and can take minutes. Allowing synchronous API requests would crash the server under load.",
+                "solution": "Implemented an asynchronous 'Producer-Consumer' pattern using BullMQ and Redis. The API simply pushes a Job ID and returns 'Pending.' A pool of isolated worker processes consumes the queue with exponential backoff for retries. This decouples the user interface from the heavy compute load.",
+                "evidence": "contract-analyzer.processor.ts"
+            },
+            {
+                "focus": "Hybrid Scoring Engine",
+                "challenge": "We needed to quantify risk across two completely different paradigms: Rust/Anchor logic and JavaScript/React frontend code. A simple average would mask critical flaws.",
+                "solution": "Built a weighted normalization engine. It ingests raw signals from Semgrep (Frontend) and our custom On-Chain Probes (Solana). It applies a 'Criticality Weight'—meaning a single 'Critical' vulnerability in *either* stack caps the total project score at 'D', regardless of how clean the other side is. This prevents a secure contract from masking an insecure frontend.",
+                "evidence": "scoring.service.ts"
+            },
+            {
+                "focus": "Real-Time Feedback Loop",
+                "challenge": "Since scans run in background workers, the frontend had no way of knowing when a job finished without polling the API every second.",
+                "solution": "Built a Redis Pub/Sub bridge. When an isolated worker finishes a scan, it publishes to a Redis channel. The API server subscribes to this channel and immediately pushes the update to the client via Server-Sent Events (SSE), creating a snappy, real-time experience without client-side polling.",
+                "evidence": "notifications-pubsub.service.ts"
+            }
+        ]
+    },
+    {
+        "slug": "midl-p2p-exchange",
+        "project_name": "Midl",
+        "category": "financial",
+        "is_featured": true,
+        "project_tagline": "A decentralized P2P exchange enabling crypto on/off-ramping for any fiat currency via collateralized custodians.",
+        "domain_context": "DeFi / P2P Exchange",
+        "tech_stack": [
+            "NestJS",
+            "MongoDB (UTXO Modeling)",
+            "Alacrity (EOSIO Fork)",
+            "Socket.io",
+            "AWS KMS",
+            "React"
+        ],
+        "project_description": "Midl is a P2P bridge that allows users to move between Crypto and Fiat without a centralized exchange. It relies on a network of 'Custodians' who stake capital to fulfill orders. Unlike standard AMMs, Midl tracks the specific lineage of every token minted. If a user on-ramps $100, they own that specific 'Batch' of tokens. When those tokens are transferred, fees are routed back to the original facilitator. This required building a complex UTXO-style ledger in MongoDB synced to a custom high-speed blockchain.",
+        "architecture_overview": "A hybrid Event-Sourced architecture. The blockchain handles custody and dispute resolution, while a NestJS backend implements a custom UTXO indexer to track asset provenance and fee splits.",
+        "key_challenges": [
+            {
+                "focus": "The 'Phantom Event' Pattern",
+                "challenge": "The underlying blockchain (Alacrity/EOSIO) does not support native event emission (like Solidity's `emit`). We needed a way for the backend to react instantly to on-chain actions (Trades, Disputes) without brutally polling the entire block state.",
+                "solution": "Engineered a 'Side-Effect Contract' pattern. Whenever a main contract executed a critical action, it made an inline call to a separate, hollow 'Logger Contract' with structured data. Our indexer listened specifically for interactions with this Logger address, effectively synthesizing an event log on a chain that didn't support one.",
+                "evidence": "IndexerUtils.ts / LoggerContract.cpp"
+            },
+            {
+                "focus": "UTXO Fee Lineage",
+                "challenge": "The business logic required a 'Sticky Fee' model: A $0.20 transfer fee had to be split between the platform and the *specific* custodian who originally facilitated the minting of those tokens, even after the tokens had changed hands 50 times.",
+                "solution": "Rejected a simple 'Account Balance' model in favor of a full UTXO (Unspent Transaction Output) architecture within MongoDB. Every token unit is tracked as a unique `Batch` document with a `previousBatchId`. When a transfer happens, we traverse the graph backward to identify the original `facilitator` and route the fee correctly.",
+                "evidence": "batch.schema.ts / batch.service.ts"
+            },
+            {
+                "focus": "Collateralized Order Matching",
+                "challenge": "Custodians could only accept orders up to 80% of their staked liquid capital. We needed a real-time matching engine that wouldn't allow race conditions (e.g., two users claiming the same custodian liquidity simultaneously).",
+                "solution": "Implemented a dual-layer lock. On-chain, the `createreqdep` action atomically moves funds from `free_amount` to `tied_amount`. Off-chain, the NestJS matcher uses MongoDB transactional sessions to reserve liquidity before broadcasting the 'Match Found' event via authenticated WebSockets.",
+                "evidence": "transaction.service.ts"
+            },
+            {
+                "focus": "Trustless Dispute Resolution",
+                "challenge": "Since this is P2P, users can lie about sending fiat. We needed a decentralized way to resolve 'He said, She said' conflicts without a centralized admin key.",
+                "solution": "Built a 4-phase on-chain judicial system (`Regular` → `Dispute` → `Appeal` → `Resolved`). Randomly selected 'Jury' users stake tokens to vote on evidence. The smart contract holds the disputed funds and programmatically slashes the loser's stake to pay the winner and the jury, ensuring economic alignment.",
+                "evidence": "midl.cpp (resolve / opendispute)"
+            }
+        ]
+    },
+    {
+        "slug": "one-portal-ai-autofill",
+        "project_name": "One Portal",
+        "category": "consumer",
+        "is_featured": false,
+        "project_tagline": "A Universal Chrome Extension that uses GenAI to scrape, map, and autofill complex job applications across 19+ ATS platforms.",
+        "domain_context": "Browser Extension / Productivity AI",
+        "tech_stack": [
+            "Chrome Extension (Manifest V3)",
+            "OpenAI GPT-4o",
+            "NestJS",
+            "React / Zustand",
+            "PostgreSQL",
+            "Google Gemini"
+        ],
+        "project_description": "Applying for jobs is repetitive data entry. One Portal automates this by acting as an 'AI Agent' inside the browser. It detects job application forms (Greenhouse, Lever, Workday, etc.), scrapes the schema (labels, types, validation rules), and uses a Large Language Model to map the user's resume data to the specific fields. It then injects the data using trusted DOM events to ensure the application state persists.",
+        "architecture_overview": "A heavy client-side architecture using Manifest V3 Service Workers for orchestration. Content scripts scrape DOMs using Strategy Pattern adapters, while a NestJS backend proxies AI requests to sanitize prompts and protect API keys.",
+        "key_challenges": [
+            {
+                "focus": "Polymorphic DOM Scraping",
+                "challenge": "Every ATS renders forms differently. Some use standard `<input>`, others use `<div role='combobox'>` or shadow DOMs. Hardcoding selectors for every site is unscalable.",
+                "solution": "Implemented a 'Heuristic Detection Engine.' Instead of relying solely on CSS selectors, the extension analyzes the semantic structure (labels, ARIA roles, proximity). We used a Strategy Pattern where specific `PlatformAdapters` (e.g., `GreenhouseAdapter`) inject custom logic only when strict detection criteria are met, allowing us to support 90% of forms with generic logic and 10% with specialized overrides.",
+                "evidence": "detectors/orchestrator.js"
+            },
+            {
+                "focus": "Trusted Event Simulation",
+                "challenge": "Modern frameworks (React/Angular) ignore simple value updates (`input.value = 'text'`). If the user doesn't physically type, the internal state (Virtual DOM) doesn't update, and the form submits as empty.",
+                "solution": "Built a 'Human Simulator' module. Instead of setting values, it dispatches a precise sequence of synthetic events (`mousedown` → `focus` → `input` → `change` → `blur`) that mimics a real user. For React-controlled components, we hijack the React Fiber node instances to force state updates explicitly when synthetic events fail.",
+                "evidence": "fillers/react-select.js"
+            },
+            {
+                "focus": "Context-Aware AI Mapping",
+                "challenge": "Mapping a Resume (Unstructured Text) to a Form (Strict Schema) is error-prone. The AI might hallucinate a 'Yes' for a 'Years of Experience' integer field.",
+                "solution": "Designed a two-stage Prompt Engineering pipeline. First, the extension scrapes the form schema (including dropdown options and validation regex). The prompt then injects the User Profile + Job Description + Form Schema. We enforce 'Strict JSON Output' mode to ensure the AI selects *only* valid options from the provided dropdown lists, preventing validation errors.",
+                "evidence": "ai.service.ts"
+            },
+            {
+                "focus": "Cross-Frame Injection",
+                "challenge": "Many career sites embed the actual application form inside an `iframe` (cross-origin), blocking the main extension script from accessing the fields due to browser security policies.",
+                "solution": "Leveraged the Chrome `webNavigation` API and Background Service Workers. The background worker maintains a registry of active frames. When the popup is clicked, it identifies the correct `frameId` containing the form and uses `chrome.tabs.sendMessage` to inject the content script directly into that specific child frame context.",
+                "evidence": "background.js"
+            }
+        ]
+    },
+    {
+        "slug": "handle-pay-smart-wallet",
+        "project_name": "Handle Pay",
+        "category": "financial",
+        "is_featured": false,
+        "project_tagline": "A seedless, gasless, multi-chain smart wallet powered by Biometric Passkeys and Account Abstraction.",
+        "domain_context": "Consumer FinTech / Web3 UX",
+        "tech_stack": [
+            "React Native (Expo)",
+            "NestJS",
+            "WebAuthn / Passkeys",
+            "ZeroDev (ERC-4337)",
+            "LazorKit (Solana)",
+            "Redis",
+            "BullMQ"
+        ],
+        "project_description": "Crypto adoption is stalled by 'Seed Phrase Anxiety' and 'Gas Fees.' Handle Pay removes both. It is a self-custodial wallet that replaces 12-word seed phrases with standard Biometric Passkeys (FaceID/TouchID). Under the hood, it spins up Smart Accounts (ERC-4337 on EVM, PDAs on Solana) that are controlled by the user's device security enclave. We integrated Paymasters to sponsor gas fees, creating a 'Chain Abstracted' experience where users send money without knowing which blockchain they are on.",
+        "architecture_overview": "A modular NestJS monolith that acts as a 'Smart Account Factory,' deriving deterministic multi-chain addresses from a single WebAuthn credential and orchestrating gasless transactions via Paymaster relays.",
+        "key_challenges": [
+            {
+                "focus": "Unified Multi-Chain Identity",
+                "challenge": "We needed a single Passkey (FaceID) to control wallets on completely different cryptographic curves: EVM (secp256k1) and Solana (ed25519). Standard WebAuthn only gives one public key.",
+                "solution": "Engineered a deterministic derivation pipeline. For EVM, we used ZeroDev to create a Kernel Smart Account controlled by the WebAuthn key. For Solana, we hashed the Credential ID to derive a PDA via LazorKit. This allows a user to 'Login with FaceID' and instantly have synchronized addresses on Ethereum and Solana from one credential.",
+                "evidence": "wallet.service.ts"
+            },
+            {
+                "focus": "Biometric Transaction Signing",
+                "challenge": "Passkeys are typically used for *login*, not *authorizing specific financial transactions*. We needed to prevent replay attacks where a valid login signature is re-used to drain funds.",
+                "solution": "Customized the WebAuthn challenge flow. Instead of a random nonce, we inject the `keccak256` hash of the transaction data (calldata) into the WebAuthn challenge. The user's biometric signature thus cryptographically commits to *that specific transaction*, making replay attacks impossible.",
+                "evidence": "verifyTransactionSignature()"
+            },
+            {
+                "focus": "Username Race Conditions",
+                "challenge": "We allowed users to claim unique `@usernames` (like Venmo). High concurrency during onboarding meant two users could pass validation simultaneously, leading to database collisions.",
+                "solution": "Implemented a 'Two-Phase Commit' reservation system using Redis and MongoDB TTL indexes. The username is atomically 'locked' for 30 minutes upon the first check. The WebAuthn registration options are only generated *after* a successful lock is acquired. If the passkey creation fails, the lock auto-expires.",
+                "evidence": "onboarding.service.ts"
+            },
+            {
+                "focus": "Gas Abstraction",
+                "challenge": "Users shouldn't need to hold ETH or SOL just to pay for a coffee. Managing gas fees for them is complex.",
+                "solution": "Integrated ERC-4337 Paymasters. The backend calculates the gas cost, communicates with the Paymaster service to sponsor the transaction, and executes the UserOp. To the user, the app feels like a standard banking app—no 'Insufficient ETH for Gas' errors ever.",
+                "evidence": "paymaster.service.ts"
+            }
+        ]
+    },
+    {
+        "slug": "bfx-hybrid-exchange",
+        "project_name": "BullionFX",
+        "category": "financial",
+        "is_featured": true,
+        "project_tagline": "A hybrid CEX for tokenized gold that uses the Stellar Blockchain as a high-speed internal settlement engine.",
+        "domain_context": "FinTech / Commodities Trading",
+        "tech_stack": [
+            "NestJS",
+            "Stellar SDK",
+            "Solidity (EIP-712)",
+            "Shamir's Secret Sharing",
+            "Gnosis Safe SDK",
+            "Socket.io",
+            "CCXT"
+        ],
+        "project_description": "Building a gold exchange requires institutional trust. BullionFX is a centralized exchange (CEX) where users trade tokenized gold (GOLD) against fiat. Unlike standard CEXs that use a private SQL database for balances (opaque), BFX uses the Stellar Blockchain as a transparent internal ledger for settlement. This provides the speed of a centralized engine with the auditability of a blockchain. It features a multi-tiered custody solution involving Shamir's Secret Sharing and Gnosis Safe cold storage.",
+        "architecture_overview": "A 'Dual-Ledger' architecture. A NestJS backend handles the high-frequency Orderbook and matching via WebSockets, while the actual settlement of assets occurs instantly on a private Stellar network to ensure immutable transaction history.",
+        "key_challenges": [
+            {
+                "focus": "Institutional Key Custody",
+                "challenge": "We held user funds in a hot wallet to allow automated withdrawals, which is a massive security risk. If the server is hacked, the private key is stolen.",
+                "solution": "Implemented a 'Keyless' architecture using Shamir's Secret Sharing (2-of-3 threshold). The private key was split into shards encrypted via distinct AWS KMS profiles across different organizational accounts (BullionFX + BlockApex). The key is reconstructed *only* in ephemeral memory for milliseconds during signing and never touches the disk.",
+                "evidence": "shamir-secret-algo.service.ts"
+            },
+            {
+                "focus": "Dual-Ledger Consistency",
+                "challenge": "We had three sources of truth: The EVM Contract (Deposits), The Stellar Ledger (Internal Settlement), and MongoDB (Order History). Keeping them in sync during network failures was critical.",
+                "solution": "Designed an 'Atomic Settlement' pipeline. Deposit events on Ethereum trigger a localized 'Mint' on Stellar. Withdrawals use a state machine (PENDING → PROCESSED) that locks funds on Stellar before releasing them on EVM. If any step fails, the system rolls back to the last checkpoint, ensuring no 'Phantom Money' is ever created.",
+                "evidence": "withdraw-funds.service.ts"
+            },
+            {
+                "focus": "Anti-Replay Signatures",
+                "challenge": "Users deposit fiat/crypto to the exchange by submitting a server-signed message to the smart contract. A malicious user could capture this signature and replay it to double-credit their account.",
+                "solution": "Implemented strict EIP-712 Typed Data signing. The contract maintains a `_signatureLog` mapping. Every deposit signature includes a unique `Nonce` and `Amount`. The contract verifies the signature on-chain and instantly invalidates the nonce, making the signature useless for any future attempts.",
+                "evidence": "BullionfxCex.sol"
+            },
+            {
+                "focus": "Real-Time Market Data",
+                "challenge": "Traders expect 'Binance-like' speed. Broadcasting orderbook updates and OHLC candles to thousands of users via HTTP polling would crash the server.",
+                "solution": "Built a high-performance WebSocket Gateway using Socket.io with Room Partitioning (e.g., `join('GOLD-USD')`). Market data is pushed via an event-driven emitter only when the orderbook state changes. OHLC candles are computed via a MongoDB Aggregation Pipeline that bucketizes trades into time intervals on the fly.",
+                "evidence": "orderbook.gateway.service.ts"
+            }
+        ]
+    },
+    {
+        "slug": "elektrik-dex-clob",
+        "project_name": "Elektrik DEX",
+        "category": "financial",
+        "is_featured": true,
+        "project_tagline": "A high-frequency Central Limit Order Book (CLOB) DEX on LightLink L2 featuring TWAP execution and ve-Tokenomics.",
+        "domain_context": "DeFi / Algorithmic Trading Protocols",
+        "tech_stack": [
+            "NestJS",
+            "Solidity (Foundry)",
+            "Rust",
+            "Redis (Binary Search Trees)",
+            "The Graph",
+            "WebSockets",
+            "EIP-712"
+        ],
+        "project_description": "Standard AMMs (Automated Market Makers) suffer from impermanent loss and lack precise price control. Elektrik brings the professional trading experience of a CEX to a DEX. It implements an off-chain Central Limit Order Book (CLOB) for millisecond matching, with trustless on-chain settlement. It supports advanced algorithmic strategies like TWAP (Time-Weighted Average Price) and integrates natively with institutional Smart Wallets (Gnosis Safe) via ERC-1271, running on the gas-efficient LightLink Layer 2.",
+        "architecture_overview": "A hybrid 'Off-Chain Match, On-Chain Settle' architecture. An in-memory Node.js matching engine (backed by Redis) pairs orders instantly, while a high-concurrency transaction queue batches settlements to the Ethereum L2.",
+        "key_challenges": [
+            {
+                "focus": "O(log n) Matching Engine",
+                "challenge": "Matching thousands of limit orders requires sorting by Price and Time. Standard database queries are too slow for an exchange engine, and array sorting is O(n log n), which degrades with volume.",
+                "solution": "Built a custom In-Memory Matching Engine using Binary Search Trees (BST). This ensures insertion and lookup time complexity stays at O(log n). We used Redis for persistence, serializing the tree state to disk to survive server restarts without losing the order book position.",
+                "evidence": "matchingEngine/index.ts"
+            },
+            {
+                "focus": "Smart Wallet Signatures (ERC-1271)",
+                "challenge": "Institutional traders use Gnosis Safe (Smart Contract Wallets), not simple Private Keys (EOAs). Standard `ecrecover` signature verification fails for smart contracts.",
+                "solution": "Implemented a dual-verification signature layer. The protocol checks the signer type: if it's an EOA, it uses ECDSA recovery. If it's a Contract, it invokes the `isValidSignature` method (ERC-1271). This allows DAOs and Multisigs to place Limit Orders and TWAP strategies natively.",
+                "evidence": "AdvancedOrderEngine.sol"
+            },
+            {
+                "focus": "High-Frequency Nonce Management",
+                "challenge": "Settling matched trades involves submitting hundreds of transactions per minute from a single 'Operator' wallet. A single failed transaction or 'stuck nonce' would halt the entire exchange pipeline.",
+                "solution": "Engineered a custom 'Transaction Queue' with a semaphore-based concurrency limit (Max 10 parallel Tx). It manages nonces locally, enforcing strict sequential ordering and implementing aggressive gas-price bumping (10% increments) to clear mempool congestion automatically.",
+                "evidence": "transactionQueue.ts"
+            },
+            {
+                "focus": "Conditional Order Logic (TWAP)",
+                "challenge": "Whales cannot dump tokens all at once; they need TWAP (Time-Weighted Average Price) to execute orders in small slices over time. Building this logic on-chain is expensive and complex.",
+                "solution": "Developed a 'Composable Order Engine' based on Predicates. Orders are cryptographically signed with 'Conditions' (e.g., 'Only execute if Block.Timestamp > X AND Price > Y'). We use Merkle Proofs to validate these batches on-chain, allowing users to program complex trading strategies that the off-chain 'WatchTower' service executes automatically.",
+                "evidence": "ComposableOrderEngine.sol"
+            }
+        ]
+    },
+    {
+        "slug": "ctv-second-screen",
+        "project_name": "CTV (Gran Hermano)",
+        "category": "consumer",
+        "is_featured": false,
+        "project_tagline": "The official Web3-integrated trivia companion app for Gran Hermano Argentina.",
+        "domain_context": "Media / GameFi / Interactive TV",
+        "tech_stack": [
+            "NestJS",
+            "MongoDB",
+            "Web3Auth",
+            "React",
+            "Redux Toolkit",
+            "Ethers.js"
+        ],
+        "project_description": "Built for the massive audience of Gran Hermano (Big Brother), CTV is a 'Second Screen' trivia app that runs in sync with the live broadcast. Viewers answer questions about the episode in real-time to earn tokens. The challenge was onboarding non-crypto natives ('Normies'). We used Web3Auth to allow social login (Google/Facebook) while silently generating a non-custodial wallet in the background, bridging the gap between Web2 UX and Web3 rewards.",
+        "architecture_overview": "A monolithic NestJS backend designed for burst traffic. It uses advanced MongoDB Aggregation Pipelines to calculate 'Time-Windowed' question availability relative to the server clock, ensuring all viewers see the same question at the exact same moment without race conditions.",
+        "key_challenges": [
+            {
+                "focus": "Invisible Web3 Onboarding",
+                "challenge": "TV viewers will not write down a 12-word seed phrase. We needed a way to give them an Ethereum wallet for rewards without breaking the 'Web2' UX.",
+                "solution": "Integrated Web3Auth's 'No-Modal' SDK. We authenticate users via standard OAuth (Google), then cryptographically derive an Ethereum private key from their OAuth token on the client side. The backend verifies the JWT against Web3Auth's JWKS, ensuring the wallet address matches the social identity without ever storing private keys.",
+                "evidence": "web3-auth.guard.ts"
+            },
+            {
+                "focus": "Time-Synced State Aggregation",
+                "challenge": "Trivia questions had to unlock and expire in perfect sync with the live TV feed. Polling the database for 'Current Question' at scale is expensive.",
+                "solution": "Engineered a temporal MongoDB Aggregation Pipeline. Instead of simple reads, we use `$switch` logic within the query to compute the `status` (Live, Pending, Expired) dynamically based on `$$NOW` (Server Time). This allows us to cache the result heavily while maintaining precise time-window enforcement.",
+                "evidence": "trivia.service.ts"
+            },
+            {
+                "focus": "Atomic Game State Machine",
+                "challenge": "Users can Answer, Hint, Skip, or Use Lifelines. Handling these mutually exclusive actions under high concurrency often leads to 'Double Spending' (e.g., using a lifeline twice).",
+                "solution": "Implemented a Discriminated Union Event Handler. Every user interaction is treated as an atomic `GameEvent`. We use MongoDB `upsert` with conditional logic (Optimistic Locking) to validate the transition state (e.g., `IF status == 'unanswered' THEN set 'answered'`) in a single atomic DB operation.",
+                "evidence": "trivia-event.service.ts"
+            }
+        ]
+    },
+    {
+        "slug": "ecorydes-solana-carpool",
+        "project_name": "EcoRydes",
+        "category": "consumer",
+        "is_featured": false,
+        "project_tagline": "A decentralized P2P carpooling platform that rewards carbon savings with Solana-based tokens.",
+        "domain_context": "GreenTech / Web3 Mobility",
+        "tech_stack": [
+            "Expo (React Native)",
+            "NestJS",
+            "Solana Web3.js",
+            "Pusher",
+            "MoonPay",
+            "MongoDB"
+        ],
+        "project_description": "Built for the Colosseum Hackathon, EcoRydes challenges the Uber/Careem monopoly by removing the 20-30% platform fee. It uses a P2P model where riders pay drivers directly in USDC on Solana. To incentivize carpooling, the app tracks physical telemetry (distance, occupancy) and mints a custom SPL token (ERD) based on the CO2 emissions saved, creating a 'Drive-to-Earn' economy for sustainable transport.",
+        "architecture_overview": "A mobile-first architecture where a NestJS backend acts as the bridge between real-time geospatial tracking (Pusher/Haversine) and on-chain settlement (Solana), managing custodial wallets to abstract gas fees from users.",
+        "key_challenges": [
+            {
+                "focus": "Off-Chain Liquidity Locking",
+                "challenge": "Locking funds on-chain (Escrow Smart Contract) for every ride request is expensive and slow. We needed to prevent 'Double Spending' without the latency of a blockchain transaction.",
+                "solution": "Implemented a 'Soft Escrow' ledger in MongoDB. When a ride is booked, we validate `(OnChainBalance - LockedBalance)` and atomically increment the `LockedBalance`. The actual on-chain USDC transfer only occurs upon ride completion. This provides instant UX with the security of a solvent balance sheet.",
+                "evidence": "wallet.service.ts"
+            },
+            {
+                "focus": "Green Tokenomics Engine",
+                "challenge": "We needed to quantify 'Sustainability'—translating physical ride data into a fungible on-chain reward without allowing users to game the system.",
+                "solution": "Engineered a Tokenomics Service that ingests telemetry: `(Distance * 0.12kg/km * PassengerCount)`. This CO2 savings value is fed into a weighted formula to mint ERD tokens via the Solana `TOKEN_2022_PROGRAM`. This connects physical impact directly to digital value.",
+                "evidence": "ride-request.service.ts"
+            },
+            {
+                "focus": "Multi-Passenger State Machine",
+                "challenge": "A single 'Ride' has complex, asynchronous states. Passenger A might be 'Dropped Off' while Passenger B is 'Picked Up', all while the Driver is 'En Route'. Managing these overlapping states caused race conditions.",
+                "solution": "Designed a Nested State Machine. The parent `Ride` tracks the vehicle trajectory, while child `Passenger` objects track individual statuses. We implemented strict transition guards (e.g., 'Ride cannot complete if Passenger B is still onboard') to ensure logical consistency across the entire trip.",
+                "evidence": "ride-status.service.ts"
+            },
+            {
+                "focus": "Geospatial Event Triggering",
+                "challenge": "Polling the driver's location every second to check if they arrived drained the battery and flooded the server.",
+                "solution": "Built a reactive Haversine Geofence. The backend receives driver coordinates via Pusher and calculates the delta to the passenger's waypoint. Proximity events (e.g., 'Driver is 500m away') are triggered server-side and pushed to the client, eliminating client-side polling entirely.",
+                "evidence": "rooms.service.ts"
+            }
+        ]
+    },
+    {
+        "slug": "huddleup-ethonline-hackathon",
+        "project_name": "HuddleUp Protocol",
+        "category": "security",
+        "is_featured": false,
+        "project_tagline": "A decentralized event platform that incentivizes social good by airdropping crypto rewards to verified volunteers.",
+        "domain_context": "Social Good / Web3 Events",
+        "tech_stack": [
+            "Neo4j (Graph DB)",
+            "NestJS",
+            "Solidity",
+            "Web3Auth",
+            "Next.js",
+            "PYUSD (PayPal Stablecoin)"
+        ],
+        "project_description": "Built for the ETHOnline 2025 Hackathon, HuddleUp solves the 'Flaky Volunteer' problem. Organizers create events and lock a sponsorship budget (in PYUSD) into a smart contract. Volunteers sign up, show up, and get their unique QR code scanned by the organizer. This scan triggers an instant, trustless airdrop to their wallet. It bridges physical attendance with digital financial rewards.",
+        "architecture_overview": "A hybrid architecture using a Graph Database (Neo4j) to model complex social relationships (Sponsors, Organizers, Participants), synchronized in real-time with an on-chain Solidity escrow contract via WebSocket event listeners.",
+        "key_challenges": [
+            {
+                "focus": "Graph Data Modeling",
+                "challenge": "Social events have complex, many-to-many relationships (User X sponsored Event Y, attended Event Z, and organizes Event A). Modeling this in a standard SQL database results in messy join tables and slow queries.",
+                "solution": "Leveraged Neo4j (Graph Database) to model users and events as nodes with typed relationships (`PARTICIPANT_OF`, `SPONSOR_OF`). This allows efficient traversal queries (e.g., 'Find all events sponsored by friends of User A') that are impossible in SQL.",
+                "evidence": "events.service.ts"
+            },
+            {
+                "focus": "Physical-to-Digital Bridge",
+                "challenge": "We needed a trustless way to prove a user was physically present at a beach cleanup or charity drive before releasing funds.",
+                "solution": "Implemented a cryptographically signed QR Verification flow. The user generates a QR code containing their wallet signature. The organizer's app scans it and calls the `verifyParticipant()` smart contract function. The contract validates the organizer's permission and instantly transfers the PYUSD reward to the attendee.",
+                "evidence": "qr.service.ts"
+            },
+            {
+                "focus": "Hybrid State Sync",
+                "challenge": "Users interact directly with the blockchain (e.g., 'Join Event' transaction). If the off-chain database (Neo4j) isn't updated immediately, the UI looks broken.",
+                "solution": "Built a robust WebSocket Event Listener using `ethers.js`. It subscribes to contract events like `ParticipantJoined` and `EventFunded`. When an event fires, a dedicated handler atomically updates the Neo4j graph state, ensuring the 'Social Graph' always reflects the 'On-Chain Truth'.",
+                "evidence": "web3.service.ts"
+            }
+        ]
+    },
+    {
+        "slug": "infra-decentralized-marketing",
+        "project_name": "Infra DApp",
+        "category": "consumer",
+        "is_featured": false,
+        "project_tagline": "A decentralized influencer marketing protocol with KPI-weighted rewards and cross-platform analytics aggregation.",
+        "domain_context": "AdTech / Web3 Marketing",
+        "tech_stack": [
+            "NestJS",
+            "Neo4j (Graph DB)",
+            "Alacrity (EOSIO)",
+            "Redis",
+            "WebSockets",
+            "AWS SES"
+        ],
+        "project_description": "Traditional influencer marketing is plagued by fake metrics and delayed payouts. Infra DApp is a performance-based protocol where brands fund campaigns in crypto, and influencers get paid automatically based on verified traction. It aggregates analytics from 7 social platforms (TikTok, YouTube, etc.) and uses a Neo4j graph engine to map attribution, ensuring that payouts are mathematically tied to real engagement (KPIs) rather than vanity metrics.",
+        "architecture_overview": "A hybrid Web3 system. The 'Oracle Layer' (NestJS + Neo4j) normalizes off-chain social data, while the 'Settlement Layer' (Alacrity Blockchain) executes trustless payouts based on that data.",
+        "key_challenges": [
+            {
+                "focus": "Algorithmic Attribution",
+                "challenge": "Fairly distributing a fixed budget among thousands of influencers is complex. A simple 'Pay Per View' model drains the budget too fast. We needed a formula that weighted 'Quality' (Engagement Rate) over 'Quantity' (Views).",
+                "solution": "Implemented a normalized KPI Engine in Cypher (Neo4j). The reward formula `((influencer_kpi / sum_kpi) * budget * interactions)` dynamically adjusts payouts based on the influencer's relative performance against the pool, preventing budget overruns.",
+                "evidence": "influencer.service.ts"
+            },
+            {
+                "focus": "Cross-Platform Normalization",
+                "challenge": "A 'Like' on LinkedIn is worth more than a 'Like' on TikTok. Aggregating metrics from 7 different APIs with different rate limits and data shapes was a data engineering nightmare.",
+                "solution": "Built a 'Delta-Based' tracking system. We store platform-specific adapters that fetch raw metrics and normalize them into a unified 'Engagement Score'. We use Delta Arrays `[new_views - old_views]` to track campaign-specific performance, ensuring we only pay for traction generated *during* the active campaign window.",
+                "evidence": "analytics.service.ts"
+            },
+            {
+                "focus": "Hybrid State Sync",
+                "challenge": "The Blockchain (Token Balances) and the Graph Database (Campaign Analytics) had to be perfectly in sync. If the Graph said '1000 Views' but the Blockchain txn failed, the system would break.",
+                "solution": "Designed a transactional 'Checkpoint' system. Campaign actions (Deposits, Claims) execute on-chain first. The backend listens for the irreversible block signal and only then commits the 'Analytics Checkpoint' to Neo4j. This ensures off-chain stats never drift ahead of on-chain reality.",
+                "evidence": "campaign.service.ts"
+            },
+            {
+                "focus": "Cryptographic Login",
+                "challenge": "We needed influencers to login with their wallet (for payouts) but didn't want to build a dApp browser. Standard Web2 login was not secure enough for financial claims.",
+                "solution": "Implemented 'Time-Windowed' Signature Verification. The user signs a message containing a timestamp bucket (5-minute window). The server validates the signature against the public key and the current time bucket, preventing 'Replay Attacks' where a hacker intercepts an old login signature.",
+                "evidence": "auth.service.ts"
+            }
+        ]
+    },
+    {
+        "slug": "kompwnd-yield-protocol",
+        "project_name": "Kompwnd",
+        "category": "financial",
+        "is_featured": false,
+        "project_tagline": "A high-frequency yield compounding protocol with graph-based referral structures on Alacrity.",
+        "domain_context": "DeFi / Yield Farming",
+        "tech_stack": [
+            "NestJS",
+            "Neo4j (Graph DB)",
+            "Alacrity (EOSIO)",
+            "Demux",
+            "Angular",
+            "Socket.IO"
+        ],
+        "project_description": "Kompwnd is a 'Yield-on-Steroids' protocol. It allows users to stake crypto assets and choose between 'Claiming' (Withdrawal) or 'Rolling' (Compounding) their rewards in real-time. The client required a highly complex 'Binary Tree' referral system, where users earn commissions based on the volume of their downlines (Left Leg vs. Right Leg). This required syncing on-chain staking actions with an off-chain Graph computation engine to distribute bonuses instantly.",
+        "architecture_overview": "A heavy Event-Sourced architecture. We used 'Demux' to listen to the Alacrity blockchain deterministically. Staking actions trigger complex graph traversals in Neo4j to calculate multi-level bonuses, which are then written back to the user's ledger.",
+        "key_challenges": [
+            {
+                "focus": "Binary Tree Commission Logic",
+                "challenge": "The client proposed a 'Binary Marketing' structure: Users earn bonuses based on the balanced volume of their 'Left' and 'Right' referral legs. Calculating this recursively for thousands of users in a relational DB (SQL) would be too slow.",
+                "solution": "Leveraged Neo4j (Graph Database) to model the user hierarchy. We wrote optimized Cypher queries to traverse the tree, calculate the `weak_leg_volume`, apply the commission cap, and distribute 'Matching Bonuses' in O(log n) time whenever a downline user deposits.",
+                "evidence": "binary-bonus.service.ts"
+            },
+            {
+                "focus": "Deterministic State Replay (Demux)",
+                "challenge": "EOSIO-based chains have micro-forks (reversible blocks). If we credited a bonus on a block that later got orphaned, the platform would lose money.",
+                "solution": "Implemented the `Demux` pattern (Deterministic Multiplexer). The backend indexes blockchain events sequentially. If a fork is detected, the system automatically rolls back the Neo4j/MongoDB state to the last 'Irreversible Block' and re-plays the new valid history, ensuring zero ledger drift.",
+                "evidence": "object-action-handler.ts"
+            },
+            {
+                "focus": "Atomic 'Roll-Over' Mechanics",
+                "challenge": "Users wanted to 'Compound' (Restake) rewards without paying the gas/tax of withdrawing and re-depositing. This required moving funds between internal contract buckets atomically.",
+                "solution": "Engineered a smart contract `roll()` action. It checks the `claimable_rewards`, verifies the `15-minute` cooldown, and atomically moves the asset from the 'Payout Pool' to the 'Staking Pool' in a single transaction. This triggers a virtual 'Deposit Event' which feeds back into the Binary Bonus engine, creating a recursive reward loop.",
+                "evidence": "kompwnd.cpp"
+            }
+        ]
+    },
+    {
+        "slug": "mento-airdrop-platform",
+        "project_name": "Mento Airdrop",
+        "category": "consumer",
+        "is_featured": false,
+        "project_tagline": "A gamified DeFi loyalty platform tracking cross-chain trading activity and social engagement for community rewards.",
+        "domain_context": "DeFi / Growth Engineering",
+        "tech_stack": [
+            "NestJS",
+            "The Graph",
+            "MongoDB",
+            "Discord.js",
+            "Twitter API v2",
+            "WebSockets"
+        ],
+        "project_description": "Mento needed to drive liquidity and community engagement for their Season 2 Airdrop. We built a 'Quest Platform' that tracks both On-Chain actions (Trading, LPing) and Off-Chain actions (Social engagement). The system aggregates real-time data from 5 different DEXs (Uniswap, Curve, Mento, etc.) on the Celo blockchain and maps it to a unified user scoring system, effectively gamifying DeFi participation.",
+        "architecture_overview": "Event-driven monolith. It uses a 'Staggered Cron' architecture to poll multiple Subgraphs without rate-limiting, reconciling 5 different DEX schemas into a single 'Swap Event' model for scoring.",
+        "key_challenges": [
+            {
+                "focus": "Multi-DEX Data Reconciliation",
+                "challenge": "We had to track user volume across 5 different protocols (Uniswap, Curve, Mento, etc.), each with different event schemas and Subgraphs. Missing a single trade meant a user might lose their airdrop eligibility.",
+                "solution": "Implemented a 'Staggered Ingestion Engine'. Independent cron jobs run at offset intervals (15s, 40s, 55s) to poll specific Subgraphs. We built a normalization layer that maps disparate schemas (e.g., Uniswap `Swap` vs. Curve `TokenExchange`) into a unified `TransactionModel`, deduplicating events by Hash to prevent double-counting.",
+                "evidence": "tasks.service.ts"
+            },
+            {
+                "focus": "Polymorphic Task Engine",
+                "challenge": "Marketing teams wanted complex, changing criteria: 'Hold $50 of cUSD for 7 days' OR 'Trade 5 different assets'. Hardcoding these rules would require a deploy for every new quest.",
+                "solution": "Designed a Polymorphic Task Pipeline. We treated Tasks as configurations, not code. The system uses a Strategy Pattern (`TaskProcessor`) where events trigger specific handlers based on the `TaskType` enum. This allowed us to launch 'Volume Challenges' or 'Diversity Quests' dynamically without rewriting the core tracking logic.",
+                "evidence": "taskTracking.service.ts"
+            },
+            {
+                "focus": "USD Normalization at Scale",
+                "challenge": "To calculate 'Volume Leaderboards', we needed the USD value of every trade. However, many exotic pairs (e.g., cEUR/Celo) didn't have a direct USD price feed at the moment of the trade.",
+                "solution": "Built a multi-hop pricing resolver in AssemblyScript (Subgraph level). If a direct USD pair didn't exist, the indexer recursively checked for a route through CELO (e.g., cEUR -> CELO -> cUSD). We also verified rates against the on-chain Broker contract's `getAmountOut` to prevent price manipulation exploits.",
+                "evidence": "pricing.ts"
+            },
+            {
+                "focus": "Sybil Resistance (Social + Wallet)",
+                "challenge": "Users try to farm airdrops by linking one Discord account to 50 wallets. We needed strict 1:1 identity mapping.",
+                "solution": "Implemented an idempotent Identity Merging system. We use ECDSA signatures to prove wallet ownership and OAuth for Discord/Twitter. The backend enforces a strict unique constraint: If a Discord ID is linked to a new wallet, the previous link is atomically severed (orphaned), ensuring one human cannot farm rewards across multiple addresses.",
+                "evidence": "auth.utils.ts"
+            }
+        ]
+    },
+    {
+        "slug": "script-tv-watch-to-earn",
+        "project_name": "Script TV",
+        "category": "consumer",
+        "is_featured": false,
+        "project_tagline": "A decentralized Watch-to-Earn streaming platform with mutable NFT glasses and multi-chain synchronization.",
+        "domain_context": "GameFi / Streaming",
+        "tech_stack": [
+            "NestJS",
+            "Solidity (ERC721A)",
+            "Video.js",
+            "The Graph",
+            "AWS S3",
+            "WebSockets"
+        ],
+        "project_description": "Script TV gamifies the television experience. Users equip 'NFT Glasses' and earn tokens by watching live content. Unlike standard NFTs, these glasses are dynamic items that degrade, level up, and require recharging. The challenge was building a system where off-chain user behavior (Watch Time) updates on-chain assets (NFT Metadata) in real-time without breaking decentralized trust.",
+        "architecture_overview": "A multi-chain event-driven system. A NestJS backend listens to events on BSC and Script Network to sync state, while a Dynamic Metadata Engine patches S3 JSON files to reflect NFT leveling.",
+        "key_challenges": [
+            {
+                "focus": "Mutable NFT Infrastructure",
+                "challenge": "Standard NFTs are static (IPFS). We needed 'Glasses' that could Level Up, change rarity, and degrade in real-time based on usage. Waiting for blockchain transactions to update metadata for every minute watched was impossible.",
+                "solution": "Built a 'Dynamic Metadata Pipeline' on AWS S3. The backend tracks game state (XP, Durability). When a significant threshold is crossed (e.g., Level Up), the system programmatically patches the specific JSON metadata file on S3. This allows the NFT marketplace to reflect the new 'Level 5' stats immediately without a gas-heavy on-chain transaction.",
+                "evidence": "utils.service.ts"
+            },
+            {
+                "focus": "Proof-of-View (Anti-Cheat)",
+                "challenge": "Users could fake 'Watch Time' API calls to drain the rewards pool without actually watching content.",
+                "solution": "Implemented ECDSA Server-Signed payloads. Critical actions (Claim Reward, Upgrade Glass) require a cryptographic signature from the backend. The backend only issues this signature after verifying the video player's heartbeat and ad-impression events, ensuring the user actually consumed the content.",
+                "evidence": "ScriptTV.sol"
+            },
+            {
+                "focus": "Multi-Chain Inventory Sync",
+                "challenge": "Users could hold assets on BSC (Binance Smart Chain) or the native Script Network. The app needed a unified view of their inventory across both chains.",
+                "solution": "Deployed a dual-provider WebSocket Gateway. It subscribes to `Transfer` and `Mint` events on both chains simultaneously. An idempotent handler updates the MongoDB user record, ensuring that if a user buys a glass on BSC, it appears in their Script TV app inventory instantly.",
+                "evidence": "app.gateway.ts"
+            }
+        ]
+    },
+    {
+        "slug": "trustamp-escrow-platform",
+        "project_name": "TruStamp",
+        "category": "financial",
+        "is_featured": true,
+        "project_tagline": "A blockchain-powered escrow platform for international trade using OpenAttestation document verification and NFT-based title transfer to eliminate counterparty risk in cross-border transactions.",
+        "domain_context": "Supply Chain / Trade Finance / Document Authentication",
+        "tech_stack": [
+            "NestJS 11",
+            "React 19 + Vite",
+            "MongoDB (Mongoose ODM)",
+            "Solidity 0.8 + Hardhat",
+            "Ethers.js v5",
+            "OpenZeppelin Contracts",
+            "OpenAttestation SDK",
+            "The Graph (GraphQL Subgraph)",
+            "Pusher (Real-time WebSocket)"
+        ],
+        "project_description": "TruStamp is an enterprise escrow platform for cross-border trade. It validates documents with OpenAttestation, mints ERC-721 title tokens, and settles payments on-chain to eliminate counterparty risk.",
+        "architecture_overview": "A modular monolith backend orchestrating a multi-phase escrow state machine, with on-chain settlement via a custom Solidity contract managing USDC payments and ERC-721 Title Escrow tokens for transferable document ownership, indexed by The Graph for historical queries.",
+        "key_challenges": [
+            {
+                "focus": "Transaction Sequencing / Race Conditions",
+                "challenge": "Sequential blockchain operations (attach document → deploy Title Escrow → nominate buyer) would fail if the first transaction wasn't mined before the second was submitted, causing the dependent call to reference non-existent on-chain state.",
+                "solution": "Implemented configurable confirmation blocking using `tx.wait(confirmationBlocks)` after every state-changing contract call. Each operation validates `receipt.status` before proceeding, with exponential backoff retry for transient RPC failures. Database state is only committed after on-chain confirmation.",
+                "evidence": "trustamp-backend-backup/src/transaction/transaction.service.ts (lines 420-470) and TRANSACTION_SEQUENCING.md"
+            },
+            {
+                "focus": "Reentrancy / Fund Security",
+                "challenge": "The escrow contract handles USDC deposits, releases, and refunds—prime targets for reentrancy attacks during fund disbursement that could drain the contract.",
+                "solution": "Applied OpenZeppelin ReentrancyGuard modifier to all fund-handling functions (`depositFunds`, `confirmDelivery`, `refundExpiredTransaction`). Combined with SafeERC20 wrapper for all token transfers and strict Checks-Effects-Interactions pattern.",
+                "evidence": "trustamp-contract-backup/contracts/TruStampEscrow.sol (lines 6, 44, 373, 403, 490)"
+            },
+            {
+                "focus": "Atomic Ownership Transfer",
+                "challenge": "Funds must only release to seller if the buyer simultaneously receives legal title (NFT) to the trade document—a two-party atomic swap across separate contract calls (ERC-20 transfer + ERC-721 ownership transfer).",
+                "solution": "Two-step Title Escrow nomination pattern: escrow contract holds document NFT as `holder`, seller remains `beneficiary`. Before `confirmDelivery()`, seller must call `nominate(buyer)` on TitleEscrow. On confirmation, contract verifies nomination then atomically executes `transferOwners()` and `safeTransfer()` in a single transaction, reverting both if either fails.",
+                "evidence": "trustamp-contract-backup/contracts/TruStampEscrow.sol (lines 395-455)"
+            },
+            {
+                "focus": "Document Authenticity / Tamper-Proofing",
+                "challenge": "Proving a digital trade document (Bill of Lading, Invoice) hasn't been tampered with and was issued by a legitimate authority, without relying on a centralized trust anchor.",
+                "solution": "Integrated OpenAttestation SDK to wrap documents with Merkle tree proofs, generating a unique `merkleRoot` hash. The root is issued on-chain to a DocumentStore contract. Verification re-computes the merkle proof client-side and validates against the immutable on-chain record.",
+                "evidence": "trustamp-backend-backup/src/open-attestation/open-attestation.service.ts (lines 174-230)"
+            },
+            {
+                "focus": "Complex Relational Queries",
+                "challenge": "Fetching document ownership required joining 5+ MongoDB collections (documents, transactions, organizations, wallets, templates) with conditional logic based on transaction state to determine current owner.",
+                "solution": "Built multi-stage MongoDB aggregation pipelines with `$lookup` joins, `$unwind` for nested arrays, and `$addFields` with conditional expressions (`$cond`) to dynamically resolve ownership based on whether transaction status is 'completed'. Single query returns fully denormalized view.",
+                "evidence": "trustamp-backend-backup/src/documents/documents.service.ts (lines 97-236)"
+            },
+            {
+                "focus": "Private Key Security",
+                "challenge": "Organization wallets require private keys for signing blockchain transactions, but storing plaintext keys creates critical security exposure.",
+                "solution": "AES-256 symmetric encryption of private keys at rest using a server-side master key. Decryption occurs in-memory only at transaction signing time via `decryptData()`, with plaintext never persisted, logged, or returned in API responses.",
+                "evidence": "trustamp-backend-backup/src/common/helpers/cryptography.ts and transaction.service.ts (line 240)"
+            }
+        ]
+    }
+]

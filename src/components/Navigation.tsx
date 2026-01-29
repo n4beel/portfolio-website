@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus } from 'lucide-react';
 
 const leftNavItems = [
+    { name: 'Intro', href: '#header' },
     { name: 'About', href: '#about' },
     { name: 'Work', href: '#projects' },
     { name: 'Experience', href: '#experience' },
@@ -78,6 +79,10 @@ export default function Navigation() {
                                     <a
                                         key={item.name}
                                         href={item.href}
+                                        {...(item.href.startsWith('mailto:') && {
+                                            target: "_blank",
+                                            rel: "noopener noreferrer"
+                                        })}
                                         onClick={() => setIsOpen(false)}
                                         className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-white hover:shadow-sm rounded-md whitespace-nowrap transition-colors"
                                     >
