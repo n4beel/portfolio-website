@@ -92,7 +92,7 @@ function validateProjects() {
 
         // Reject the pre-multi-category field so stale entries cannot slip back in
         if (project.category) {
-            errors.push('"category" is obsolete — use the "categories" array instead');
+            errors.push('"category" is obsolete, use the "categories" array instead');
         }
 
         // Optional outbound links must be absolute URLs when present
