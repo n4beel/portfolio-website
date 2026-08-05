@@ -18,7 +18,7 @@ export default function ProjectLinks({ project }) {
                     onClick={(event) => event.stopPropagation()}
                     className="text-gray-500 underline-offset-4 hover:text-primary hover:underline"
                 >
-                    Live ↗
+                    Details ↗
                 </a>
             )}
             {project.repo_url && (
