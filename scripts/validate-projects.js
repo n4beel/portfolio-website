@@ -8,6 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { CATEGORIES } from '../src/data/categories.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,9 +22,15 @@ const REQUIRED_FIELDS = [
     'project_description',
     'architecture_overview',
     'key_challenges',
+    'categories',
 ];
 
 const REQUIRED_CHALLENGE_FIELDS = ['focus', 'challenge', 'solution'];
+
+// Optional fields, validated only when present.
+const OPTIONAL_URL_FIELDS = ['live_url', 'repo_url'];
+
+const KNOWN_CATEGORIES = Object.keys(CATEGORIES);
 
 function validateProjects() {
     const projectsPath = path.join(__dirname, '../src/data/projects.json');
@@ -64,6 +71,37 @@ function validateProjects() {
         if (project.tech_stack && !Array.isArray(project.tech_stack)) {
             errors.push('"tech_stack" must be an array');
         }
+
+        // Validate categories is a non-empty array of known values
+        if (project.categories) {
+            if (!Array.isArray(project.categories) || project.categories.length === 0) {
+                errors.push('"categories" must be a non-empty array');
+            } else {
+                project.categories.forEach((category) => {
+                    if (!KNOWN_CATEGORIES.includes(category)) {
+                        errors.push(
+                            `Unknown category "${category}" (known: ${KNOWN_CATEGORIES.join(', ')})`
+                        );
+                    }
+                });
+                if (new Set(project.categories).size !== project.categories.length) {
+                    errors.push('"categories" contains duplicates');
+                }
+            }
+        }
+
+        // Reject the pre-multi-category field so stale entries cannot slip back in
+        if (project.category) {
+            errors.push('"category" is obsolete — use the "categories" array instead');
+        }
+
+        // Optional outbound links must be absolute URLs when present
+        OPTIONAL_URL_FIELDS.forEach((field) => {
+            const value = project[field];
+            if (value !== undefined && !/^https:\/\/\S+$/.test(value)) {
+                errors.push(`"${field}" must be an absolute https URL`);
+            }
+        });
 
         // Validate key_challenges structure
         if (project.key_challenges) {

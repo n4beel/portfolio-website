@@ -1,26 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { ArrowUpRight } from "lucide-react";
+import { CATEGORIES, CATEGORY_ORDER, DEFAULT_CATEGORY } from "../data/categories.js";
+import ProjectLinks from "./ProjectLinks.jsx";
 
-const CATEGORIES = {
-    financial: {
-        id: "financial",
-        label: "Financial Infrastructure",
-        context: "High-frequency exchanges, P2P bridges, and regulated custody.",
-    },
-    security: {
-        id: "security",
-        label: "Security & DevOps",
-        context: "Automated auditing tools, sandboxed execution, and infrastructure hardening.",
-    },
-    consumer: {
-        id: "consumer",
-        label: "Consumer & Growth",
-        context: "Product-led growth, GameFi, and AI-powered browser experiences.",
-    },
-};
-
-const CATEGORY_ORDER = ["financial", "security", "consumer"];
-const DEFAULT_CATEGORY = "financial";
+const FEATURED_LIMIT = 4;
 
 export default function FeaturedProjects({ allProjects }) {
     const [hasMounted, setHasMounted] = useState(false);
@@ -44,11 +27,16 @@ export default function FeaturedProjects({ allProjects }) {
         window.history.pushState({}, "", url.toString());
     };
 
-    // Filter projects by active category, limit to 4
+    // Projects in the active category: pinned (is_featured) first, then array
+    // order fills the remaining slots. Stable within each group.
     const filteredProjects = useMemo(() => {
-        return allProjects
-            .filter((project) => project.category === activeCategory)
-            .slice(0, 4);
+        const inCategory = allProjects.filter((project) =>
+            project.categories.includes(activeCategory)
+        );
+        return [
+            ...inCategory.filter((project) => project.is_featured),
+            ...inCategory.filter((project) => !project.is_featured),
+        ].slice(0, FEATURED_LIMIT);
     }, [allProjects, activeCategory]);
 
     // SSR placeholder to prevent hydration mismatch
@@ -66,7 +54,7 @@ export default function FeaturedProjects({ allProjects }) {
                     ))}
                 </div>
                 <div className="grid gap-6 md:grid-cols-2">
-                    {[1, 2, 3, 4].map((i) => (
+                    {Array.from({ length: FEATURED_LIMIT }, (_, i) => i).map((i) => (
                         <div
                             key={i}
                             className="h-72 animate-pulse rounded-3xl border border-gray-100 bg-gray-50"
@@ -111,10 +99,9 @@ export default function FeaturedProjects({ allProjects }) {
                 className="grid gap-6 md:grid-cols-2 animate-fade-in"
             >
                 {filteredProjects.map((project) => (
-                    <a
+                    <div
                         key={project.slug}
-                        href={`/projects/${project.slug}`}
-                        className="group flex h-full flex-col rounded-3xl border border-gray-100 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl"
+                        className="group relative flex h-full flex-col rounded-3xl border border-gray-100 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl"
                     >
                         <div className="flex items-start justify-between gap-4">
                             <span className="text-xs font-semibold uppercase tracking-wider text-primary bg-primary/10 px-3 py-1 rounded-full">
@@ -128,7 +115,14 @@ export default function FeaturedProjects({ allProjects }) {
 
                         <div className="mt-6">
                             <h4 className="text-xl md:text-2xl font-bold text-secondary group-hover:text-primary transition-colors">
-                                {project.project_name}
+                                {/* Stretched link: covers the card so the whole surface is
+                                    clickable, while ProjectLinks opts out via `relative z-10`. */}
+                                <a
+                                    href={`/projects/${project.slug}`}
+                                    className="after:absolute after:inset-0 after:content-['']"
+                                >
+                                    {project.project_name}
+                                </a>
                             </h4>
                             <p className="mt-3 text-sm leading-relaxed text-gray-600">
                                 {project.project_tagline}
@@ -151,11 +145,14 @@ export default function FeaturedProjects({ allProjects }) {
                             )}
                         </div>
 
-                        <div className="mt-auto pt-6 text-sm font-semibold text-primary flex items-center gap-2">
-                            Read Case Study
-                            <ArrowUpRight size={16} />
+                        <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-6 text-sm font-semibold">
+                            <span className="flex items-center gap-2 text-primary">
+                                Read Case Study
+                                <ArrowUpRight size={16} />
+                            </span>
+                            <ProjectLinks project={project} />
                         </div>
-                    </a>
+                    </div>
                 ))}
             </div>
 

@@ -1,9 +1,63 @@
 [
     {
+        "slug": "tokenomics-agent-content-system",
+        "project_name": "Tokenomics Content System",
+        "categories": [
+            "ai"
+        ],
+        "is_featured": true,
+        "repo_url": "https://github.com/n4beel/tokenomics-content-system",
+        "project_tagline": "A multi-agent content pipeline built on Google ADK, where specialized agents research, plan, write, illustrate and publish, and a deterministic quality gate decides whether they get to stop.",
+        "domain_context": "Agentic AI / Content Automation",
+        "tech_stack": [
+            "Google ADK",
+            "TypeScript",
+            "NestJS",
+            "Next.js",
+            "Gemini",
+            "Kimi K2.5",
+            "Perplexity Sonar (OpenRouter)",
+            "Payload CMS",
+            "Mermaid"
+        ],
+        "project_description": "An internal R&D prototype (never shipped to production) exploring how far a content operation can be handed to a swarm of specialized agents. A monorepo of three services: an ADK agent runtime, a NestJS scheduler and content API, and a Next.js dashboard for batch review. Two orchestration graphs run distinct pipelines: a weekly social pipeline that produces batches of platform-specific posts, and a long-form SEO pipeline that writes MDX blog posts, generates branded hero images and Mermaid diagrams, and publishes drafts to the CMS. The interesting problem was never generation quality on its own. It was control: how to make a non-deterministic system produce output that reliably satisfies hard constraints.",
+        "architecture_overview": "Two SequentialAgent roots over a shared pool of single-responsibility agents. 'Carl' runs research (Riley) then planning (Maya) then a bounded LoopAgent pairing a writer (Quill) with a quality gate (MayaQA). 'SamBlogPipeline' runs research then a LoopAgent pairing the SEO writer (Sam) with a schema-constrained validator (SamQA). Agents communicate only through ADK outputKey slots in session state (research_brief, content_plan, drafts, qa_result, blog_output) with conversation history disabled, so each stage receives exactly its declared inputs. Deterministic work lives in tools rather than prompts: topic queueing, research retrieval with citations, image generation, Mermaid rendering, published-post registry lookups for internal linking, and CMS publishing.",
+        "key_challenges": [
+            {
+                "focus": "Never let the model be the quality gate",
+                "challenge": "The obvious design is an LLM reviewer agent that reads the drafts and decides whether they pass. In practice this fails in the least useful way: the reviewer is as prone to instruction drift as the writer, so a batch with 19 posts instead of 25, or with placeholder text like 'this post will cover...', gets waved through. The pipeline then reports success while producing unusable output.",
+                "solution": "MayaQA is declared as an agent for orchestration purposes, but its LLM output is discarded entirely. All QA runs programmatically in an afterAgentCallback: exact draft-count assertion, regex detection of placeholder phrasing, and per-platform length thresholds. Generation stays probabilistic; validation is deterministic code. The agent boundary is kept only so the loop can schedule it.",
+                "evidence": "agents/src/agents/maya-qa.ts"
+            },
+            {
+                "focus": "Bounded retry with a machine-readable exit condition",
+                "challenge": "A write-then-review loop needs a stopping rule. 'Loop until the reviewer is satisfied' either terminates immediately on a lenient pass or never terminates on a strict one, and free-text verdicts cannot be branched on reliably.",
+                "solution": "SamQA emits a constrained output schema whose verdict is an enum (ALL_PASSED, NEEDS_MINOR_EDITS, NEEDS_REWRITE) alongside structured failure counts. The LoopAgent branches on that enum and is hard-capped at three iterations, so the pipeline always terminates and always terminates with a known state rather than an opinion.",
+                "evidence": "agents/src/agents/sam-qa.ts"
+            },
+            {
+                "focus": "Context isolation between agents",
+                "challenge": "By default each agent in a chain inherits the accumulated conversation. That bleed is expensive and actively harmful: the writer starts echoing the researcher's phrasing, the QA agent sees the writer's justifications and is anchored by them, and no stage can be tested on its own because its behaviour depends on everything upstream.",
+                "solution": "Every agent runs with includeContents set to none and reads only its declared state keys. Each stage becomes a pure function of its inputs, which made per-agent smoke harnesses possible and kept token cost flat as the pipeline grew.",
+                "evidence": "agents/src/agents/*.ts"
+            },
+            {
+                "focus": "Staying provider-agnostic",
+                "challenge": "ADK resolves models through its own registry, which makes it easy to hard-wire a pipeline to one vendor. That is a poor bet when model quality, pricing and rate limits move month to month, and it makes it impossible to route different stages to different models.",
+                "solution": "Wrote a custom LLM connector implementing the ADK model interface and registered it into LLMRegistry, so non-Gemini model strings resolve like first-class citizens. Routing a stage to a different provider becomes a string change rather than a rewrite.",
+                "evidence": "agents/src/agents/kimi-llm.ts"
+            }
+        ]
+    },
+    {
         "slug": "bulwark-audit-platform",
         "project_name": "Bulwark",
-        "category": "security",
-        "is_featured": false,
+        "categories": [
+            "security",
+            "ai"
+        ],
+        "is_featured": true,
+        "repo_url": "https://github.com/n4beel/bulwark-monorepo",
         "project_tagline": "The first automated auditor for Solana that combines Rust-native AST parsing with encrypted on-chain reputation.",
         "domain_context": "Web3 Security / Smart Contract Auditing",
         "tech_stack": [
@@ -15,8 +69,8 @@
             "MongoDB",
             "Redux Toolkit"
         ],
-        "project_description": "Manual audits cannot keep pace with the Solana ecosystem's explosive growth. Bulwark fills this gap as an automated 'Pre-Audit' platform. Unlike standard linters that use simple regex, Bulwark runs a custom Rust engine to parse the full Abstract Syntax Tree (AST) of Anchor programs. It identifies 23+ complex attack vectors (like missing PDA seeds or CPI privilege escalation), estimates the audit cost based on code complexity, and cryptographically commits the results to the Solana blockchain using Arcium's Multi-Party Computation (MPC) to ensure privacy.",
-        "architecture_overview": "A hybrid tri-layer system: A high-performance Rust binary for static analysis, a NestJS orchestration layer for managing GitHub workspaces and AI agents, and a Solana program for encrypted, immutable record-keeping.",
+        "project_description": "Manual audits cannot keep pace with the Solana ecosystem's growth. Bulwark fills the gap as an automated 'pre-audit' platform. Unlike linters that pattern-match on source text, Bulwark runs a custom Rust engine that parses the full Abstract Syntax Tree of Anchor programs and scores 23 weighted risk factors across four categories — structural, security, systemic and economic. From that score it interpolates an audit timeline and cost band against historical audit data, then commits the result to Solana with the pricing readable on-chain and the audited commit hash encrypted.",
+        "architecture_overview": "A tri-layer system with a deliberate split of authority. A Rust binary built on the `syn` crate parses the AST and computes the 23 deterministic factors — it alone owns the score. A NestJS orchestration layer stages GitHub workspaces, drives the Rust service over a local HTTP interface, and runs a separate GPT-4o pass for the qualitative dimensions static analysis cannot reach. An Anchor program on Solana stores the audit record, with pricing fields in plaintext for public verification and the commit hash encrypted client-side through Arcium.",
         "key_challenges": [
             {
                 "focus": "The Pivot: Regex vs. AST",
@@ -25,29 +79,50 @@
                 "evidence": "analyzer/src/visitor.rs"
             },
             {
-                "focus": "Encrypted On-Chain Storage",
-                "challenge": "We needed to prove an audit happened without leaking the vulnerability report publicly on-chain. Standard encryption wasn't enough; we needed a way to verify the pricing model publicly while keeping the specific commit hash private.",
-                "solution": "Integrated Arcium's RescueCipher (MPC). The NestJS backend derives a shared secret via x25519 key exchange and encrypts the commit hash off-chain. The Solana program then stores this encrypted blob. This allows public verification of the 'Audit Certificate' without revealing the proprietary code data.",
-                "evidence": "arcium-storage.service.ts"
+                "focus": "Deterministic Score, Advisory AI",
+                "challenge": "With an LLM in the loop the tempting design is to let it grade the code, because it returns confident, well-written severity judgements that read like an auditor wrote them. It also makes the headline number irreproducible: the same commit analysed twice yields two different scores, and a client disputing a quote has nothing to check it against.",
+                "solution": "The two passes are structurally separated so they cannot contaminate each other. The score is derived purely from the deterministic AST factors — four sub-scores (structural, security, systemic, economic) combined on fixed weights of 0.2 / 0.3 / 0.3 / 0.2 — and the audit estimate is a function of that number alone. The GPT-4o pass runs six independent analyses in parallel via `tokio::join!` (documentation clarity, testing coverage, financial-logic intricacy, profit attack vectors, value at risk, and code hotspots), each falling back to a default metric set if its call fails. Of all of that, only the hotspot list reaches the report. The model can point an auditor at a file; it cannot move the score or the quote.",
+                "evidence": "analyzer/src/score_calculator.rs (calculate_total_score) / analyzer/src/ai_analysis.rs"
             },
             {
-                "focus": "Hybrid Orchestration",
-                "challenge": "Coordinating three disparate runtimes (Rust binary, Node.js backend, AI API) created race conditions. If the Rust analysis finished before the AI, or if the repository was too large, the HTTP request would timeout, leaving the workspace in a zombie state.",
-                "solution": "Designed a 'Shared Workspace' architecture. The NestJS backend handles the git cloning and file staging, then invokes the Rust binary via a local HTTP interface (`/augment`) with a strict `RUST_ANALYZER_TIMEOUT`. We used `tokio::join!` in Rust to parallelize the AI and AST threads, ensuring the entire analysis pipeline completes under 30 seconds for 95% of repos.",
-                "evidence": "static-analysis.service.ts"
+                "focus": "False Positives as a Reachability Problem",
+                "challenge": "The AST rewrite killed the macro-parsing false positives, but a second class survived it. Flagging every division and modulo in a crate also flags helper functions, test fixtures and dead utility code that no instruction can actually reach. That noise is worse than a missed finding, because it teaches an auditor to skim past the output.",
+                "solution": "We made the factors handler-centric rather than file-centric. Each analyser builds a call graph across the crate, identifies genuine Anchor instruction handlers through a signature heuristic (`is_anchor_handler`), then runs a depth-first traversal from every handler to compute the reachable function set. Arithmetic, CPI and access-control findings are counted only inside that set, so risky math in a helper nothing calls contributes zero. Reachability does the filtering, not a hand-maintained list of exceptions.",
+                "evidence": "analyzer/src/factors/arithmetic.rs (find_reachable_functions)"
             },
             {
                 "focus": "Complexity-to-Cost Algorithm",
-                "challenge": "Translating abstract 'Cyclomatic Complexity' scores into a dollar value for a client is difficult. Linear pricing models failed because audit difficulty scales exponentially with code entanglement, not line count.",
-                "solution": "Developed a piecewise linear interpolation engine. We mapped 5 historical data points (Median Complexity vs. Audit Days) and applied a 'Phi-Weighted' efficiency factor (0.8) to account for multi-auditor parallelization, resulting in a defensible, data-driven quote.",
-                "evidence": "risk-scoring-engine.ts"
+                "challenge": "Turning a complexity score into a dollar figure is the part clients actually argue about. Linear pricing fails because audit difficulty scales with how entangled the code is, not with line count — and any single point estimate invites a dispute the moment the audit runs long.",
+                "solution": "A piecewise linear interpolation over five calibration points taken from completed audits, mapping median complexity (16.98 through 50.62) onto audit timeline (8 through 30 days). Each point carries both a median and a skewed timeline, so the engine emits a band rather than a number. A phi-weighted multiplier (`1 - 0.8 + 0.8 * 2/3`) converts the two-auditor timeline into a three-auditor one, modelling the fact that adding auditors does not divide the work cleanly, and cost falls out as weeks multiplied by a $2,500–$6,000 weekly rate.",
+                "evidence": "analyzer/src/score_calculator.rs (estimated_audit_effort)"
+            },
+            {
+                "focus": "Where the Estimator Breaks Down",
+                "challenge": "Five calibration points is a thin dataset, and they only span complexity 16.98 to 50.62. Any repository scoring outside that window falls off the end of the interpolation entirely.",
+                "solution": "Calling this solved would be dishonest. Outside the calibrated range the engine falls back to a hardcoded slope — 1.468429 above, 0.627746 below — fitted to nothing in particular, so a genuinely large protocol still receives a confident-looking quote with no data behind it. Shipping it that way was a deliberate tradeoff to get the pipeline working end to end, but it is the weakest link in the product and the first thing I would replace. The fix is not a better curve, it is more calibration points from completed audits, plus surfacing a confidence indicator when a score lands outside the calibrated band instead of silently extrapolating.",
+                "evidence": "analyzer/src/score_calculator.rs (SLOPE_ABOVE_MAX / SLOPE_BELOW_MIN)"
+            },
+            {
+                "focus": "Selective Disclosure On-Chain",
+                "challenge": "An audit certificate has to prove two things that pull against each other. The pricing must be public, so a client can verify the quote was not retro-fitted after the fact. The specific commit audited must stay private, because a repository identifier next to a low security score is a map for an attacker.",
+                "solution": "We split the on-chain `AuditRecord` by field instead of encrypting it wholesale. Pricing — report id, day range, auditor count, USD range and score — is stored in plaintext and readable by anyone on Solscan. The commit hash is encrypted client-side using Arcium's RescueCipher over an x25519 shared secret and stored as an opaque 32-byte field, with a separate Arcium computation that re-encrypts it for a nominated receiver so a client can grant a third party access without the platform ever publishing it. The limit is worth stating plainly: the encrypted circuit is wiring, not production cryptography. `share_commit_hash` merges two bytes into a u16 rather than operating over the full 32-byte array — enough to prove the Arcium integration end to end, not enough to describe the commit hash as MPC-protected in front of a real client.",
+                "evidence": "program/programs/bulwark_storage/src/lib.rs / program/encrypted-ixs/src/lib.rs"
+            },
+            {
+                "focus": "Degrading Instead of Failing",
+                "challenge": "Three runtimes — a Rust binary, a NestJS backend and a hosted model API — each fail in a different way. A large monorepo can push the Rust pass past any sensible request timeout, and the naive design of failing the job means the biggest and most valuable repositories are precisely the ones that never produce a report.",
+                "solution": "A shared-workspace architecture where NestJS owns git cloning and file staging, then invokes the Rust analyser over a local HTTP interface (`/augment`) under a configurable `RUST_ANALYZER_TIMEOUT` that defaults to five minutes. On timeout or connection failure the orchestrator logs the reason and proceeds without the augmentation rather than aborting, so the client still receives a report built from whatever did complete. The same principle runs one layer down, where each of the six AI sub-analyses falls back to a default metric set on error instead of taking the whole batch with it.",
+                "evidence": "backend/src/static-analysis/static-analysis.service.ts"
             }
         ]
     },
     {
         "slug": "nxellent-security-platform",
         "project_name": "Nxellent",
-        "category": "security",
+        "categories": [
+            "security",
+            "ai"
+        ],
         "is_featured": false,
         "project_tagline": "A full-stack Web3 security platform that correlates Smart Contract risks with Frontend vulnerabilities.",
         "domain_context": "DevSecOps / Web3 Infrastructure",
@@ -61,30 +136,41 @@
             "MongoDB"
         ],
         "project_description": "Most Web3 hacks don't happen in the smart contract—they happen in the frontend (e.g., compromised NPM packages or DNS hijacks). Nxellent is a comprehensive auditing platform that analyzes the *entire* dApp stack. It combines on-chain analysis (Solana program authorities) with off-chain scanning (Next.js/React vulnerabilities) to generate a unified 'Shield Score.' It provides two distinct dashboards: a detailed technical view for Founders to fix bugs, and a high-level risk summary for Investors doing due diligence.",
-        "architecture_overview": "An event-driven distributed system where a NestJS API orchestrates ephemeral, security-hardened Docker containers via BullMQ to execute untrusted code scans safely.",
+        "architecture_overview": "An event-driven distributed system built around a trust boundary. A NestJS API accepts scan requests and does no analysis itself; it enqueues jobs onto BullMQ and returns immediately. A separate pool of worker processes, deployed on their own VM rather than alongside the API, consumes the queue and spawns a hardened, single-use Docker container per job to execute untrusted project code. Results flow back through Redis Pub/Sub into Server-Sent Events, so the browser sees progress without polling.",
         "key_challenges": [
             {
                 "focus": "Ephemeral Sandboxing",
-                "challenge": "To audit a project, we must run `npm install` and build scripts on untrusted code. Running this on the main server is a massive security risk (RCE attacks) and resource hog.",
-                "solution": "Architected an ephemeral container lifecycle. The worker spawns a security-hardened Docker container (dropped Linux capabilities, `no-new-privileges`) for each job. The container mounts the code as a temporary volume, executes the scan, and is immediately destroyed upon completion, ensuring total isolation and zero resource leakage.",
+                "challenge": "Auditing a dApp means running `npm install` and the project's build scripts on code we have no reason to trust. That is not an edge case we tolerate — it is the core operation, and npm lifecycle scripts are arbitrary code execution by design. Running it on the API host would hand an attacker a shell on the machine holding every other client's scan results.",
+                "solution": "Every job gets its own Docker container, built to be hostile to whatever runs inside it: Linux capabilities dropped to the minimum, `no-new-privileges` set so a setuid binary cannot escalate, a non-root user inside the container, CPU and memory ceilings so a fork bomb or a memory balloon starves only itself, and the project source mounted as a temporary volume. The container is destroyed on completion or timeout — there is no reuse, so nothing an attacker writes to disk survives into the next client's scan. The worker pool runs on a VM separate from the API, so even a full container escape lands somewhere that holds no user data and no production credentials.",
                 "evidence": "worker.ts / docker-compose.vm.yml"
+            },
+            {
+                "focus": "What the Sandbox Does Not Guarantee",
+                "challenge": "It would be easy to describe the above as isolation and stop there. It is not isolation in the sense that word implies to a security reviewer, and the platform's own threat model has to say so.",
+                "solution": "A container is a shared-kernel boundary. Dropped capabilities and `no-new-privileges` raise the cost of an escape considerably, but a kernel vulnerability defeats all of it at once, because the untrusted code and the host are running against the same kernel. The honest description of what we built is defence in depth with a blast radius deliberately kept small, not a guarantee that untrusted code cannot get out. Two things follow from that. First, the placement decision matters more than the container flags — putting workers on a disposable VM with no access to the primary database is what actually bounds the damage. Second, if I rebuilt this the container boundary would be replaced with a microVM (Firecracker) or a gVisor sandbox, so the untrusted build gets its own kernel and the guarantee matches the claim."
+            },
+            {
+                "focus": "Correlating Contract Risk with Frontend Risk",
+                "challenge": "The premise of the product is that most dApp compromises are not smart-contract bugs — they are hijacked frontends, dependency-confusion attacks and DNS takeovers. But scoring both halves and reporting two numbers puts the correlation back on the reader, and a reader who could do that correlation did not need the tool.",
+                "solution": "The scoring model treats specific pairs as multiplicative rather than additive, because the risks compound in a way the individual findings do not show. An unrevoked program upgrade authority is a known and often accepted design choice on its own. A frontend with an injectable dependency is a routine finding on its own. Together they are a live path to a drained protocol: an attacker who owns the bundle can point users at a malicious instruction while the contract's own authority remains capable of changing behaviour underneath them. The engine encodes those pairings explicitly, so the report explains why a combination is worse than its parts rather than leaving two independent scores side by side.",
+                "evidence": "scoring.service.ts"
+            },
+            {
+                "focus": "Normalizing Across Two Paradigms",
+                "challenge": "We had to quantify risk across Rust/Anchor program logic and JavaScript/React frontend code — two ecosystems whose findings share no severity scale, no tooling and no common notion of what 'critical' means. Averaging them produces the exact failure the product exists to prevent: a clean contract masking an insecure frontend, presented as a healthy overall grade.",
+                "solution": "A weighted normalization layer ingests raw signals from Semgrep on the frontend and custom on-chain probes on the Solana side, mapping both into a shared severity vocabulary before any arithmetic happens. On top of that sits a criticality rule that overrides the weighting: a single critical finding on either side caps the total project grade at a D no matter how clean the other side is. The cap exists precisely because a weighted average is mathematically reasonable and, here, produces a dangerous answer.",
+                "evidence": "scoring.service.ts"
             },
             {
                 "focus": "Distributed Job Queues",
                 "challenge": "Security scans are CPU-intensive and can take minutes. Allowing synchronous API requests would crash the server under load.",
-                "solution": "Implemented an asynchronous 'Producer-Consumer' pattern using BullMQ and Redis. The API simply pushes a Job ID and returns 'Pending.' A pool of isolated worker processes consumes the queue with exponential backoff for retries. This decouples the user interface from the heavy compute load.",
+                "solution": "Implemented an asynchronous producer-consumer pattern using BullMQ and Redis. The API pushes a job ID and returns 'pending' immediately. A pool of isolated worker processes consumes the queue with exponential backoff for retries, and jobs carry hard timeouts so a hung build is reaped rather than occupying a worker indefinitely. This decouples the user interface from the heavy compute load and, just as importantly, keeps the untrusted-code execution on the far side of a queue boundary from the request-handling process.",
                 "evidence": "contract-analyzer.processor.ts"
-            },
-            {
-                "focus": "Hybrid Scoring Engine",
-                "challenge": "We needed to quantify risk across two completely different paradigms: Rust/Anchor logic and JavaScript/React frontend code. A simple average would mask critical flaws.",
-                "solution": "Built a weighted normalization engine. It ingests raw signals from Semgrep (Frontend) and our custom On-Chain Probes (Solana). It applies a 'Criticality Weight'—meaning a single 'Critical' vulnerability in *either* stack caps the total project score at 'D', regardless of how clean the other side is. This prevents a secure contract from masking an insecure frontend.",
-                "evidence": "scoring.service.ts"
             },
             {
                 "focus": "Real-Time Feedback Loop",
                 "challenge": "Since scans run in background workers, the frontend had no way of knowing when a job finished without polling the API every second.",
-                "solution": "Built a Redis Pub/Sub bridge. When an isolated worker finishes a scan, it publishes to a Redis channel. The API server subscribes to this channel and immediately pushes the update to the client via Server-Sent Events (SSE), creating a snappy, real-time experience without client-side polling.",
+                "solution": "Built a Redis Pub/Sub bridge. When an isolated worker finishes a stage it publishes to a Redis channel. The API server subscribes and pushes the update to the client over Server-Sent Events, which suits a one-way progress stream better than a WebSocket and survives reconnection without extra bookkeeping. The result is a live scan log with no client-side polling.",
                 "evidence": "notifications-pubsub.service.ts"
             }
         ]
@@ -92,7 +178,9 @@
     {
         "slug": "midl-p2p-exchange",
         "project_name": "Midl",
-        "category": "financial",
+        "categories": [
+            "financial"
+        ],
         "is_featured": true,
         "project_tagline": "A decentralized P2P exchange enabling crypto on/off-ramping for any fiat currency via collateralized custodians.",
         "domain_context": "DeFi / P2P Exchange",
@@ -134,11 +222,16 @@
         ]
     },
     {
-        "slug": "one-portal-ai-autofill",
-        "project_name": "One Portal",
-        "category": "consumer",
-        "is_featured": false,
-        "project_tagline": "A Universal Chrome Extension that uses GenAI to scrape, map, and autofill complex job applications across 19+ ATS platforms.",
+        "slug": "zenapply-ai-autofill",
+        "project_name": "ZenApply",
+        "categories": [
+            "ai",
+            "consumer"
+        ],
+        "is_featured": true,
+        "live_url": "https://zenapply.app",
+        "role_note": "Sole engineer on a three-person founding team. The entire technical stack — Chrome extension, NestJS backend, generation pipeline and database — was designed and built by me.",
+        "project_tagline": "A Chrome extension that scrapes, maps, and autofills complex job applications across 19+ ATS platforms, and writes the free-text answers in the applicant's own voice.",
         "domain_context": "Browser Extension / Productivity AI",
         "tech_stack": [
             "Chrome Extension (Manifest V3)",
@@ -148,7 +241,7 @@
             "PostgreSQL",
             "Google Gemini"
         ],
-        "project_description": "Applying for jobs is repetitive data entry. One Portal automates this by acting as an 'AI Agent' inside the browser. It detects job application forms (Greenhouse, Lever, Workday, etc.), scrapes the schema (labels, types, validation rules), and uses a Large Language Model to map the user's resume data to the specific fields. It then injects the data using trusted DOM events to ensure the application state persists.",
+        "project_description": "Applying for jobs is repetitive data entry. ZenApply automates it by acting as an agent inside the browser. It detects job application forms (Greenhouse, Lever, Workday, etc.), scrapes the schema (labels, types, validation rules), and uses a Large Language Model to map the user's resume data to the specific fields. It then injects the data using trusted DOM events so the application state persists. The generation layer goes further than field mapping: cover letters and free-text answers are written to a user-selected writing style, either learned from writing samples the user supplies or driven by direct prompt instructions.",
         "architecture_overview": "A heavy client-side architecture using Manifest V3 Service Workers for orchestration. Content scripts scrape DOMs using Strategy Pattern adapters, while a NestJS backend proxies AI requests to sanitize prompts and protect API keys.",
         "key_challenges": [
             {
@@ -174,13 +267,20 @@
                 "challenge": "Many career sites embed the actual application form inside an `iframe` (cross-origin), blocking the main extension script from accessing the fields due to browser security policies.",
                 "solution": "Leveraged the Chrome `webNavigation` API and Background Service Workers. The background worker maintains a registry of active frames. When the popup is clicked, it identifies the correct `frameId` containing the form and uses `chrome.tabs.sendMessage` to inject the content script directly into that specific child frame context.",
                 "evidence": "background.js"
+            },
+            {
+                "focus": "Separating Voice from Format",
+                "challenge": "Users pick a writing style: upload writing samples that get analysed to extract their voice, write direct prompt instructions, or fall back to a default style. The naive implementation treats a style as one opaque blob of instructions and injects it into every generation call. That breaks immediately, because a style actually contains two different kinds of rule. Voice — vocabulary, sentence rhythm, how formal the register is — should apply everywhere. Format — greeting, sign-off, target word count, paragraph structure — belongs to cover letters only. Ship them as one blob and the format rules leak into short free-text answers, so 'Why do you want to work here?' comes back as a letter that opens with 'Hi team,' and signs off with the applicant's name.",
+                "solution": "Split the extracted style into two independently addressable parts and let each generation surface request only what it needs. Sample analysis writes voice attributes and format attributes into separate fields rather than one instruction string, and the free-text answer path composes a prompt from voice alone while the cover letter path composes from both. Generation runs at temperature 0, so the same job posting plus the same style produces the same output — which is what makes the two style modes (learned-from-samples versus direct instructions) comparable against each other instead of a matter of taste."
             }
         ]
     },
     {
         "slug": "handle-pay-smart-wallet",
         "project_name": "Handle Pay",
-        "category": "financial",
+        "categories": [
+            "financial"
+        ],
         "is_featured": false,
         "project_tagline": "A seedless, gasless, multi-chain smart wallet powered by Biometric Passkeys and Account Abstraction.",
         "domain_context": "Consumer FinTech / Web3 UX",
@@ -225,7 +325,9 @@
     {
         "slug": "bfx-hybrid-exchange",
         "project_name": "BullionFX",
-        "category": "financial",
+        "categories": [
+            "financial"
+        ],
         "is_featured": true,
         "project_tagline": "A hybrid CEX for tokenized gold that uses the Stellar Blockchain as a high-speed internal settlement engine.",
         "domain_context": "FinTech / Commodities Trading",
@@ -270,7 +372,9 @@
     {
         "slug": "elektrik-dex-clob",
         "project_name": "Elektrik DEX",
-        "category": "financial",
+        "categories": [
+            "financial"
+        ],
         "is_featured": true,
         "project_tagline": "A high-frequency Central Limit Order Book (CLOB) DEX on LightLink L2 featuring TWAP execution and ve-Tokenomics.",
         "domain_context": "DeFi / Algorithmic Trading Protocols",
@@ -315,7 +419,9 @@
     {
         "slug": "ctv-second-screen",
         "project_name": "CTV (Gran Hermano)",
-        "category": "consumer",
+        "categories": [
+            "consumer"
+        ],
         "is_featured": false,
         "project_tagline": "The official Web3-integrated trivia companion app for Gran Hermano Argentina.",
         "domain_context": "Media / GameFi / Interactive TV",
@@ -353,7 +459,9 @@
     {
         "slug": "ecorydes-solana-carpool",
         "project_name": "EcoRydes",
-        "category": "consumer",
+        "categories": [
+            "consumer"
+        ],
         "is_featured": false,
         "project_tagline": "A decentralized P2P carpooling platform that rewards carbon savings with Solana-based tokens.",
         "domain_context": "GreenTech / Web3 Mobility",
@@ -397,7 +505,9 @@
     {
         "slug": "huddleup-ethonline-hackathon",
         "project_name": "HuddleUp Protocol",
-        "category": "security",
+        "categories": [
+            "security"
+        ],
         "is_featured": false,
         "project_tagline": "A decentralized event platform that incentivizes social good by airdropping crypto rewards to verified volunteers.",
         "domain_context": "Social Good / Web3 Events",
@@ -435,7 +545,9 @@
     {
         "slug": "infra-decentralized-marketing",
         "project_name": "Infra DApp",
-        "category": "consumer",
+        "categories": [
+            "consumer"
+        ],
         "is_featured": false,
         "project_tagline": "A decentralized influencer marketing protocol with KPI-weighted rewards and cross-platform analytics aggregation.",
         "domain_context": "AdTech / Web3 Marketing",
@@ -479,7 +591,9 @@
     {
         "slug": "kompwnd-yield-protocol",
         "project_name": "Kompwnd",
-        "category": "financial",
+        "categories": [
+            "financial"
+        ],
         "is_featured": false,
         "project_tagline": "A high-frequency yield compounding protocol with graph-based referral structures on Alacrity.",
         "domain_context": "DeFi / Yield Farming",
@@ -517,7 +631,9 @@
     {
         "slug": "mento-airdrop-platform",
         "project_name": "Mento Airdrop",
-        "category": "consumer",
+        "categories": [
+            "consumer"
+        ],
         "is_featured": false,
         "project_tagline": "A gamified DeFi loyalty platform tracking cross-chain trading activity and social engagement for community rewards.",
         "domain_context": "DeFi / Growth Engineering",
@@ -561,7 +677,9 @@
     {
         "slug": "script-tv-watch-to-earn",
         "project_name": "Script TV",
-        "category": "consumer",
+        "categories": [
+            "consumer"
+        ],
         "is_featured": false,
         "project_tagline": "A decentralized Watch-to-Earn streaming platform with mutable NFT glasses and multi-chain synchronization.",
         "domain_context": "GameFi / Streaming",
@@ -599,7 +717,9 @@
     {
         "slug": "trustamp-escrow-platform",
         "project_name": "TruStamp",
-        "category": "financial",
+        "categories": [
+            "financial"
+        ],
         "is_featured": true,
         "project_tagline": "A blockchain-powered escrow platform for international trade using OpenAttestation document verification and NFT-based title transfer to eliminate counterparty risk in cross-border transactions.",
         "domain_context": "Supply Chain / Trade Finance / Document Authentication",
@@ -652,6 +772,200 @@
                 "challenge": "Organization wallets require private keys for signing blockchain transactions, but storing plaintext keys creates critical security exposure.",
                 "solution": "AES-256 symmetric encryption of private keys at rest using a server-side master key. Decryption occurs in-memory only at transaction signing time via `decryptData()`, with plaintext never persisted, logged, or returned in API responses.",
                 "evidence": "trustamp-backend-backup/src/common/helpers/cryptography.ts and transaction.service.ts (line 240)"
+            }
+        ]
+    },
+    {
+        "slug": "formole-virtual-sports-coaching",
+        "project_name": "Formole",
+        "categories": [
+            "ai"
+        ],
+        "is_featured": false,
+        "live_url": "https://tezeract.ai/ai-case-studies/formole-ai-based-virtual-sports-coaching-app/",
+        "role_note": "Built at Tezeract, where I was Co-Founder & CTO. I architected and developed this product personally — the AI pipeline, the backend and the system design.",
+        "project_tagline": "A virtual soccer coaching app that analyses a phone-recorded kick with pose estimation and returns the kind of correction a coach would give.",
+        "domain_context": "Computer Vision / Sports Technology",
+        "tech_stack": [
+            "Python",
+            "TensorFlow",
+            "OpenCV",
+            "Pose Estimation",
+            "AWS",
+            "Mobile (iOS / Android)"
+        ],
+        "project_description": "One-to-one coaching is gated by money and geography: a promising player who lives two hours from a good coach simply does not get coached. Formole replaces the first layer of that feedback loop. A player records a kick on their phone, and the app runs pose estimation across the frames, derives the biomechanics of the strike, and returns specific corrections rather than a score. It shipped to the App Store and Play Store and went on to raise venture funding.",
+        "architecture_overview": "A mobile capture client feeding a Python inference service. The app guides recording so footage lands inside a known framing envelope, uploads the clip, and a server-side pipeline runs pose estimation per frame, reconstructs the kick as a time series of joint positions, and converts that series into biomechanical measurements before any feedback text is generated. The rule layer that turns measurements into coaching sits above the model and is editable without retraining.",
+        "key_challenges": [
+            {
+                "focus": "Constraining the input instead of hardening the model",
+                "challenge": "Consumer phone footage is close to a worst case for pose estimation. The camera is propped against a water bottle at an unknown height, the sun is behind the player, the framing cuts off a foot at the moment of contact. Training a model robust to all of that is a research programme, not an MVP.",
+                "solution": "We moved the problem out of the model and into the capture experience. The recording screen overlays a framing guide and refuses to submit clips where the required joints are not visible for the whole strike, which narrows the input distribution enough that a standard pose estimator performs reliably inside it. The tradeoff is explicit and worth defending: we made the user do slightly more work at capture time in exchange for feedback that is actually trustworthy, rather than accepting any video and silently degrading to guesses."
+            },
+            {
+                "focus": "Keypoints are not coaching",
+                "challenge": "A pose model returns joint coordinates. A player wants to know why the ball sliced. Nothing in the model output bridges that gap, and the naive move — showing the skeleton overlay and calling it analysis — looks impressive and helps nobody.",
+                "solution": "We inserted a measurement layer between the model and the user. Joint positions across frames are reduced to the quantities a coach actually reads: plant-foot placement relative to the ball, hip and shoulder rotation through the strike, the frame of contact, follow-through direction. Those measurements are then compared against thresholds derived with domain input, so the app says the plant foot is too far behind the ball rather than reporting an angle. Keeping the thresholds in a rule layer rather than learning them end to end meant coaching logic could be corrected in an afternoon when a domain expert disagreed with it."
+            },
+            {
+                "focus": "Where the inference runs",
+                "challenge": "Running the model on-device avoids upload latency and video bandwidth, which matters for users on constrained mobile data. Running it server-side gives consistent results and lets the model improve without shipping an app update. Both were defensible and the decision was not reversible cheaply.",
+                "solution": "We put inference on the server and spent the effort on making the upload tolerable instead — clipping to the relevant seconds on-device before upload, and treating analysis as asynchronous with a notification rather than blocking the user on a progress bar. The deciding factor was iteration speed: at that stage the coaching logic was changing weekly, and an on-device model would have tied every improvement to an app store review cycle."
+            }
+        ]
+    },
+    {
+        "slug": "spintip-highlight-generation",
+        "project_name": "Spintip",
+        "categories": [
+            "ai"
+        ],
+        "is_featured": false,
+        "live_url": "https://tezeract.ai/ai-case-studies/spintip-sports-highlight-video-maker/",
+        "role_note": "Built at Tezeract, where I was Co-Founder & CTO. I architected and developed this product personally — the AI pipeline, the backend and the system design.",
+        "project_tagline": "Automatic tennis highlight generation — object detection segments a match into rallies, and the cut is assembled from play, not from a person scrubbing a timeline.",
+        "domain_context": "Computer Vision / Video Processing",
+        "tech_stack": [
+            "Python",
+            "Flask",
+            "TensorFlow",
+            "OpenCV",
+            "React",
+            "Video Processing"
+        ],
+        "project_description": "A recreational tennis match is two hours of footage containing perhaps eight minutes of play. Spintip removes the gap automatically: a user records or uploads a match, and the app returns a highlight reel without anyone opening an editor. The system detects ball and players frame by frame, reconstructs where play started and stopped, and assembles the reel from those segments.",
+        "architecture_overview": "A Flask service wrapping a two-stage video pipeline, with a React client for upload and playback. Stage one is cheap: motion and scene gating over decoded frames to discard the long stretches where nothing is in play. Stage two runs the TensorFlow object detector only on surviving segments, tracking ball and player positions to establish rally boundaries. A final assembly step cuts and concatenates the segments into an output reel.",
+        "key_challenges": [
+            {
+                "focus": "Defining a highlight without a highlight model",
+                "challenge": "The obvious framing is to train a model that recognises exciting moments. That framing is a trap: excitement is not a visual property, there was no labelled dataset of it for amateur tennis, and any model we trained would have been learning one annotator's taste.",
+                "solution": "We redefined the target into something objectively detectable. A rally is not a matter of opinion — it starts at a serve and ends when the ball stops being in play, and both are observable from ball position and motion continuity. So the system detects rallies, not highlights, and the reel is simply every rally with the dead time removed. The output is defensible for the same reason it is simpler: nothing in the pipeline is making an aesthetic judgement it cannot justify."
+            },
+            {
+                "focus": "Not running the detector on everything",
+                "challenge": "Object detection on every frame of a two-hour match is enormously wasteful when most of those frames are players walking back to the baseline, and on the hardware available it made processing time comparable to the match length itself.",
+                "solution": "A cheap gating stage runs first. Frame differencing and scene-change detection over decoded frames identify candidate active regions at a small fraction of the cost of inference, and only those regions reach the detector. Because the expensive stage sees a fraction of the footage, total processing time became a function of how much tennis was actually played rather than how long the camera ran — which is also the behaviour a user intuitively expects."
+            },
+            {
+                "focus": "Ball tracking through occlusion",
+                "challenge": "A tennis ball is small, fast and frequently invisible: motion-blurred to a smear at speed, hidden behind a player, or lost against a crowd background. Per-frame detection alone produces a track full of holes, and a naive rally-boundary rule reads every hole as the end of the point.",
+                "solution": "We stopped treating detection gaps as evidence. Ball positions feed a tracker that maintains a trajectory estimate across missed frames, and rally termination requires sustained absence plus corroborating signals — players out of position, no motion in the court region — rather than a single frame without a detection. Tuning that hysteresis was most of the accuracy work on the project, and it is the sort of thing that is invisible in a demo and decisive in real footage."
+            }
+        ]
+    },
+    {
+        "slug": "navex-attendance-tracking",
+        "project_name": "Navex",
+        "categories": [
+            "ai"
+        ],
+        "is_featured": false,
+        "live_url": "https://tezeract.ai/ai-case-studies/navex-ai-powered-student-attendance-system/",
+        "role_note": "Built at Tezeract, where I was Co-Founder & CTO. I architected and developed this product personally — the AI pipeline, the backend and the system design.",
+        "project_tagline": "Face-recognition attendance for school buses, built to work in the worst possible conditions for face recognition and to keep working when the network does not.",
+        "domain_context": "Computer Vision / EdTech Safety Systems",
+        "tech_stack": [
+            "Python",
+            "Face Recognition",
+            "Deep Learning",
+            "Node.js",
+            "MongoDB",
+            "Geolocation",
+            "Mobile (iOS / Android)"
+        ],
+        "project_description": "Schools track who is on the bus with a clipboard, which means a parent asking whether their child boarded gets an answer at the end of the route, if at all. Navex marks attendance automatically as students board, using face recognition on a device mounted in the bus, and pushes boarding events and live bus location to four separate audiences: parents, the school, the bus attendant and a super-admin. The product is a set of coordinated applications over one shared real-time state.",
+        "architecture_overview": "An on-vehicle capture device running recognition locally against a per-route enrolled set, backed by a Node.js API and MongoDB. Recognition results and GPS position are written to a local queue first and synced opportunistically, so the bus application is authoritative offline and the server reconciles on reconnect. Four clients — parent, school, attendant and super-admin — read projections of the same event stream rather than querying each other.",
+        "key_challenges": [
+            {
+                "focus": "The hardest environment for face recognition",
+                "challenge": "A bus door at 7am is close to adversarial for recognition. Students board in a fast queue, backlit by a window with the sun behind them, faces turned away, half of them in winter hoods, on a vehicle that is vibrating. Benchmark accuracy figures for face recognition are measured on nothing resembling this.",
+                "solution": "We narrowed the problem until it was tractable. Recognition runs against only the students enrolled on that route rather than a school-wide gallery, turning a large identification problem into a small one where the confusion set is a few dozen faces. Multiple frames are captured per boarding and the decision is made over the sequence, so one bad frame does not decide anything. Most importantly, low-confidence matches are not guessed — they surface to the attendant as a prompt to confirm, which keeps a human in the loop exactly where the system is weakest. An attendance system that silently marks the wrong child present is worse than one that occasionally asks."
+            },
+            {
+                "focus": "Offline is the normal case, not the failure case",
+                "challenge": "School routes pass through underpasses, industrial areas and rural stretches with no usable signal. A design that treats the network as available and connectivity loss as an error state produces a product that fails every single morning.",
+                "solution": "We inverted the assumption. Recognition runs on the device, and boarding events are written to a local queue that is the source of truth until sync succeeds. Events carry device-side timestamps and idempotency keys so a replayed queue after a long outage cannot double-mark a student, and the parent-facing app distinguishes between 'no boarding event' and 'no contact with the bus' rather than collapsing both into silence. The synchronisation logic, not the recognition model, was the larger share of the engineering."
+            },
+            {
+                "focus": "Biometrics on children",
+                "challenge": "This is a facial recognition system whose subjects are minors who did not choose to be enrolled in it. Treating that as purely a technical problem would be a failure of the design, and any honest write-up has to state where the boundaries were drawn.",
+                "solution": "The design decisions that follow from taking that seriously: recognition runs on the vehicle so face imagery is processed locally rather than streamed to a server, the enrolled representation is a derived embedding tied to a route rather than a retained photo library, and the system's outputs are boarding events — not a movement history or a searchable face database. The deployment is also bounded by the operator: this is a tool for a school that already has a duty of care and already takes attendance, automating a record it was keeping anyway, rather than new surveillance introduced under a safety framing."
+            }
+        ]
+    },
+    {
+        "slug": "mapapp-wildfire-risk",
+        "project_name": "MapApp",
+        "categories": [
+            "ai"
+        ],
+        "is_featured": false,
+        "live_url": "https://tezeract.ai/ai-case-studies/mapapp-ai-wildfire-risk-assessment-app/",
+        "role_note": "Built at Tezeract, where I was Co-Founder & CTO. I architected and developed this product personally — the AI pipeline, the backend and the system design.",
+        "project_tagline": "Wildfire exposure assessment for Canadian properties — country-scale raster risk layers made interactive in a browser, with an escape-time estimate attached to a specific address.",
+        "domain_context": "Geospatial AI / Risk Assessment",
+        "tech_stack": [
+            "Python",
+            "Geospatial Analysis (GDAL / Rasterio)",
+            "Machine Learning",
+            "PostGIS",
+            "Raster Tiling",
+            "React"
+        ],
+        "project_description": "A large share of Canadian homes sit against dense forest, and the owners have no granular sense of their own exposure — fire risk is communicated regionally when the thing that matters is what is burning within a few hundred metres of a specific property. MapApp puts a risk surface over the whole country as raster layers, lets a user select an area, and reports what fuel is present, how close the forest is, what the historical fire activity looks like, and an estimate of how long a fire in the vicinity would take to reach them.",
+        "architecture_overview": "A geospatial pipeline in Python producing pre-computed raster layers, served to a React map client as pyramid tiles. Fuel classification and risk scoring run offline over source rasters and vector datasets, writing results into a tiled pyramid plus a queryable store for point lookups. The browser never sees full-resolution national data — it requests the resolution appropriate to its zoom level, and area selections resolve server-side against the underlying data rather than against the rendered tiles.",
+        "key_challenges": [
+            {
+                "focus": "National raster coverage in a browser",
+                "challenge": "The risk surface covers Canada at a resolution fine enough to distinguish one property from its neighbour. That dataset cannot be sent to a browser, and a map that only works when zoomed in is useless for the country-level overview the product opens with.",
+                "solution": "Standard geospatial answer applied properly: pre-compute a tile pyramid so each zoom level carries only the resolution it can display, and keep the analytical queries away from the tiles entirely. The visual layer is a rendering artefact; when a user selects a region, the numbers come from a server-side query against the source data at full resolution. Conflating the two — computing statistics from the tiles being displayed — is the easy mistake here, and it silently makes every reported figure a function of the user's zoom level."
+            },
+            {
+                "focus": "Reconciling heterogeneous source data",
+                "challenge": "The inputs came from different agencies at different resolutions, projections, vintages and classification schemes. Fuel-type data, forest cover, historical fire perimeters and parcel boundaries did not agree on grid, and naively resampling everything to a common grid quietly manufactures precision that the coarsest input does not support.",
+                "solution": "We normalised to a common projection and grid, but carried the provenance and native resolution of each input through the pipeline rather than discarding it at ingest. Where a derived value depended on a coarse input, that constraint remained attached to the output, so the interface could avoid presenting a property-level number that was really a kilometre-scale number resampled small. Getting this wrong is not a rendering bug — it is the difference between an assessment and a confident-looking fabrication."
+            },
+            {
+                "focus": "Presenting an escape-time estimate responsibly",
+                "challenge": "The most compelling number the app produces is also the most dangerous one. An estimate of how long a fire would take to reach a property is a model output derived from fuel, terrain and distance under assumed conditions — and a user reading it as a countdown could make a genuinely fatal decision on a windy day the model did not anticipate.",
+                "solution": "We treated the framing as part of the engineering, not as copywriting applied afterwards. The estimate is presented as a comparative planning figure under stated assumptions rather than a prediction, expressed as a range, and paired with the inputs that drove it so a user can see it is conditional. The product's job is to tell someone their exposure is materially worse than they assumed and that they should have a plan — it is explicitly not an evacuation timer, and building it so that it could never be mistaken for one was a requirement rather than a disclaimer."
+            }
+        ]
+    },
+    {
+        "slug": "duckends-gesture-feedback",
+        "project_name": "Duckends",
+        "categories": [
+            "ai"
+        ],
+        "is_featured": false,
+        "role_note": "Built at Tezeract, where I was Co-Founder & CTO. I architected and developed this product personally — the AI pipeline, the backend and the system design.",
+        "project_tagline": "Feedback collection with no form and no button — real-time custom object detection reads a thumbs-up or thumbs-down from a camera feed.",
+        "domain_context": "Computer Vision / Human-Computer Interaction",
+        "tech_stack": [
+            "Python",
+            "TensorFlow",
+            "OpenCV",
+            "Custom Object Detection",
+            "Edge Inference"
+        ],
+        "project_description": "Response rates on feedback forms are terrible because the interaction costs more than the opinion is worth to the person giving it. Duckends removes the interaction: a camera watches the point where feedback is wanted, a custom-trained detector recognises a thumbs-up or thumbs-down gesture, and the response is recorded without the respondent touching anything. The interesting engineering is almost entirely in deciding when someone is answering rather than in recognising the gesture itself.",
+        "architecture_overview": "A single-stage detector trained on hand gestures, running continuously on modest edge hardware against a live camera feed. Detections are not events on their own — they pass through a temporal confirmation layer that requires a gesture to be held and stable across frames before it counts, and a debounce that prevents one person's held gesture from registering repeatedly.",
+        "key_challenges": [
+            {
+                "focus": "Separating a response from incidental motion",
+                "challenge": "People wave, scratch their heads, gesture while talking and hold objects. A detector firing on any frame that contains a thumbs-up shape produces a feedback stream that is mostly noise, and noise in a feedback product is worse than no product, because the client acts on it.",
+                "solution": "We made intent the thing being detected, not the gesture. A response requires the gesture to be held stable, roughly stationary, for a sustained window of frames — deliberately longer than an accidental hand position persists but short enough not to feel like a wait. A debounce window then suppresses repeat firings from the same held gesture. Both thresholds were tuned against footage of real deployment conditions rather than against the validation set, because the failure mode we cared about does not appear in clean training data."
+            },
+            {
+                "focus": "Training a detector for a deliberately narrow job",
+                "challenge": "General hand-pose models are heavy, and most of their capability was irrelevant — we needed two classes, reliably, on hardware that costs very little and sits in the enclosure of a kiosk.",
+                "solution": "We trained a small custom detector on exactly the two gestures, with the training data collected under the lighting and camera geometry of the actual deployment rather than from a public dataset. The narrow scope is what made the accuracy achievable at that model size: the model does not need to understand hands, only to distinguish two specific shapes from everything else, in a fixed setting. Scoping the model down to the problem, rather than adopting a capable general one and fighting its cost, was the decision the product rested on."
+            },
+            {
+                "focus": "Knowing where this is the wrong interface",
+                "challenge": "A camera-based interface is exclusionary in ways a button is not. Someone whose hands are full, who uses a wheelchair positioned outside the camera's framing, or who has limited hand mobility cannot respond at all — and unlike a broken button, the system gives them no indication that it failed.",
+                "solution": "The honest answer is that this is a supplement, not a replacement, and we were clear with clients about it: gesture capture raises response volume in settings where nobody was filling in the form anyway, but removing the conventional input path alongside it converts a low response rate into a systematically biased one. The correct deployment keeps a physical fallback and treats the camera as the path of least resistance rather than the only path — which is a product constraint, not a limitation we expected to engineer away later."
             }
         ]
     }

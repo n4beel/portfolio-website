@@ -4,16 +4,20 @@ import '../styles/global.css';
 
 interface Props {
 	title: string;
+	description?: string;
 }
 
-const { title } = Astro.props;
+const DEFAULT_DESCRIPTION =
+	"Nabeel Ahmed Khan - Senior Backend Engineer building distributed backend systems and AI automation.";
+
+const { title, description = DEFAULT_DESCRIPTION } = Astro.props;
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="description" content="Nabeel Ahmed Khan - Senior Backend Architect" />
+		<meta name="description" content={description} />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />

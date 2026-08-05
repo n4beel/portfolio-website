@@ -1,14 +1,8 @@
 import { useMemo, useState } from "react";
+import { CATEGORIES, CATEGORY_ORDER } from "../data/categories.js";
+import ProjectLinks from "./ProjectLinks.jsx";
 
 const normalize = (value) => value.toLowerCase();
-
-const CATEGORIES = {
-    financial: "Financial Infrastructure",
-    security: "Security & DevOps",
-    consumer: "Consumer & Growth",
-};
-
-const CATEGORY_ORDER = ["financial", "security", "consumer"];
 
 export default function ProjectArchive({ projects }) {
     const [search, setSearch] = useState("");
@@ -51,7 +45,7 @@ export default function ProjectArchive({ projects }) {
 
             const matchesCategory =
                 selectedCategory === null ||
-                project.category === selectedCategory;
+                project.categories.includes(selectedCategory);
 
             return matchesSearch && matchesTech && matchesCategory;
         });
@@ -108,7 +102,7 @@ export default function ProjectArchive({ projects }) {
                                     : "border-gray-200 text-gray-500 hover:border-primary/40"
                                     }`}
                             >
-                                {CATEGORIES[categoryId]}
+                                {CATEGORIES[categoryId].label}
                             </button>
                         ))}
                     </div>
@@ -149,16 +143,22 @@ export default function ProjectArchive({ projects }) {
 
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {filteredProjects.map((project) => (
-                    <a
+                    <div
                         key={project.slug}
-                        href={`/projects/${project.slug}`}
-                        className="group flex h-full flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg"
+                        className="group relative flex h-full flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg"
                     >
                         <span className="text-xs font-semibold uppercase tracking-wider text-primary bg-primary/10 px-3 py-1 rounded-full w-fit">
                             {project.domain_context}
                         </span>
                         <h3 className="mt-4 text-lg font-bold text-secondary group-hover:text-primary transition-colors">
-                            {project.project_name}
+                            {/* Stretched link: covers the card so the whole surface is clickable,
+                                while the outbound links below opt out via `relative z-10`. */}
+                            <a
+                                href={`/projects/${project.slug}`}
+                                className="after:absolute after:inset-0 after:content-['']"
+                            >
+                                {project.project_name}
+                            </a>
                         </h3>
                         <p className="mt-2 text-sm text-gray-600 leading-relaxed">
                             {project.project_tagline}
@@ -173,10 +173,11 @@ export default function ProjectArchive({ projects }) {
                                 </span>
                             ))}
                         </div>
-                        <div className="mt-auto pt-6 text-sm font-semibold text-primary">
-                            View Case Study →
+                        <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-6 text-sm font-semibold">
+                            <span className="text-primary">View Case Study →</span>
+                            <ProjectLinks project={project} />
                         </div>
-                    </a>
+                    </div>
                 ))}
             </div>
 

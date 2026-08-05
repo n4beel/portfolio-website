@@ -7,6 +7,11 @@ import react from '@astrojs/react';
 
 // https://astro.build/config
 export default defineConfig({
+  // "One Portal" was the pre-launch placeholder name; keep the old case study URL alive.
+  redirects: {
+    '/projects/one-portal-ai-autofill': '/projects/zenapply-ai-autofill'
+  },
+
   vite: {
     plugins: [tailwindcss()],
     server: {

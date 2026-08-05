@@ -16,7 +16,10 @@ if (!project) {
 }
 ---
 
-<Layout title={`${project.project_name} | Case Study`}>
+<Layout
+    title={`${project.project_name} | Case Study`}
+    description={project.project_tagline}
+>
     <main class="max-w-4xl mx-auto px-6 md:px-12 pt-20 pb-24">
         <a
             href="/projects"
@@ -48,6 +51,14 @@ if (!project) {
                 {project.project_tagline}
             </p>
 
+            {
+                project.role_note && (
+                    <p class="mt-4 border-l-2 border-primary/30 pl-4 text-sm text-gray-500">
+                        {project.role_note}
+                    </p>
+                )
+            }
+
             <div class="mt-6 flex flex-wrap gap-2">
                 {
                     project.tech_stack.map((tech) => (
@@ -57,6 +68,33 @@ if (!project) {
                     ))
                 }
             </div>
+
+            {
+                (project.live_url || project.repo_url) && (
+                    <div class="mt-6 flex flex-wrap gap-3">
+                        {project.live_url && (
+                            <a
+                                href={project.live_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="inline-flex items-center gap-2 rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary"
+                            >
+                                Visit Live Site ↗
+                            </a>
+                        )}
+                        {project.repo_url && (
+                            <a
+                                href={project.repo_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-secondary transition-colors hover:border-primary/40 hover:text-primary"
+                            >
+                                View Source ↗
+                            </a>
+                        )}
+                    </div>
+                )
+            }
         </section>
 
         <section class="mt-10">
@@ -97,6 +135,11 @@ if (!project) {
                                     </p>
                                 </div>
                             </div>
+                            {challenge.evidence && (
+                                <p class="mt-4 border-t border-gray-100 pt-3 font-mono text-xs text-gray-400">
+                                    {challenge.evidence}
+                                </p>
+                            )}
                         </div>
                     ))
                 }

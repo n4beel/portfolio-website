@@ -3,16 +3,17 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus } from 'lucide-react';
 
+// Order mirrors the section order in src/pages/index.astro.
 const leftNavItems = [
     { name: 'Intro', href: '#header' },
     { name: 'About', href: '#about' },
     { name: 'Work', href: '#projects' },
-    { name: 'Experience', href: '#experience' },
+    { name: 'Achievements', href: '#achievements' },
 ];
 
 const rightNavItems = [
+    { name: 'Experience', href: '#experience' },
     { name: 'Education', href: '#education' },
-    { name: 'Achievements', href: '#achievements' },
     { name: 'Contact', href: 'mailto:contact@nabeelkhan.dev' },
 ];
 
