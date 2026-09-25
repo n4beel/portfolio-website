@@ -22,3 +22,6 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# working notes and resume sources: kept locally, never published or served
+private/

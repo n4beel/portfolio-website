@@ -32,4 +32,6 @@ export const CATEGORIES = {
 
 export const CATEGORY_ORDER = ["ai", "financial", "security", "consumer"];
 
-export const DEFAULT_CATEGORY = "ai";
+// Opens the landing page on the financial case studies: Midl, Handle Pay and
+// Ghost Pay lead that tab.
+export const DEFAULT_CATEGORY = "financial";

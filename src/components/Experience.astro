@@ -1,54 +1,115 @@
 ---
+// Company-first: the company is the top-level heading, and one or more roles
+// sit beneath it. BlockApex carries two roles because it acquired Xord's
+// services division partway through my time there.
 const experiences = [
   {
-    company: "BlockApex",
-    role: "Senior Software Engineer & Technical Lead",
-    period: "Mar 2023 -- Feb 2026",
-    location: "Karachi, PK",
-    description:
-      "Led architecture for internal security engines and high-scale client infrastructure. I oversaw the engineering lifecycle for complex distributed systems, bridging high-concurrency Web2 services (NestJS/Redis) with cryptographic security protocols (Rust). A key initiative involved overhauling the organization's DevOps culture, replacing ad-hoc deploys with standardized CI/CD pipelines across 8 distinct architectures.",
-    metrics: ["Distributed Systems", "CI/CD Standardization"],
-    tech: ["Rust", "Solana", "NestJS", "AWS"],
+    company: "ZenApply",
+    url: "https://zenapply.app",
+    location: "Remote",
+    roles: [
+      {
+        title: "Lead Engineer",
+        period: "Feb 2026 - Present",
+        points: [
+          "Only engineer on a three-person team. I built and run the whole stack solo: a React browser extension, a NestJS / BullMQ pipeline, and the production infrastructure.",
+          "The ingestion pipeline pulls from 40+ external sources through background queues with per-source rate limiting, dedupe, and enrichment, and normalizes 25k+ job listings a day from sources with unstable schemas.",
+          "The AI auto-fill engine handles 2k+ applications a day across 30+ ATS platforms. It completes ~100% of officially supported platforms and 80-90% of unsupported ones by reading each form's schema and constraining the model to valid answers.",
+          "Deterministic fields fill instantly from a stored profile; open-ended ones stream back from the model over SSE, with a batch fallback.",
+        ],
+        metrics: ["Sole Engineer", "LLM Integration"],
+        tech: ["NestJS", "BullMQ", "React", "LLM integration", "SSE"],
+      },
+    ],
   },
   {
-    company: "Xord",
-    role: "Full Stack Blockchain Engineer",
-    period: "May 2022 -- Mar 2023",
+    company: "BlockApex",
     location: "Karachi, PK",
-    description:
-      "Architected end-to-end backend infrastructure for decentralized media platforms. My role focused on performance engineering; I profiled and rewrote complex PostgreSQL aggregation pipelines for a blockchain explorer, using execution-plan analysis and materialized views to cut API query latency. Additionally, I led the design of secure, non-custodial authentication flows for enterprise applications.",
-    metrics: ["Query Optimization", "System Performance"],
-    tech: ["Solidity", "Node.js", "PostgreSQL"],
+    period: "May 2022 - Feb 2026",
+    note: "Acquired Xord's services division in Mar 2023.",
+    roles: [
+      {
+        title: "Senior Software Engineer & Technical Lead",
+        period: "Mar 2023 - Feb 2026",
+        points: [
+          "Led the full engineering lifecycle for client projects, from scoping vague client problems into concrete architectures through delivery, overseeing project teams and code quality.",
+          "Designed the payment infrastructure for Midl, a P2P crypto-fiat bridge, using distributed locking and idempotency to handle 10,000+ concurrent users without dropped or duplicated transactions.",
+          "Built the backend for Handle Pay, a unified self-custody wallet: deterministic address derivation across EVM and Solana, cross-platform passkey authentication, and fault-tolerant RPC handling.",
+          "Designed the routing logic for Aasan Bridge, a LayerZero-based liquidity solver moving assets between EVM chains and Solana, and architected the order-book (CLOB) backend for Elektrik DEX.",
+          "Built the backend for Gran Hermano's official quiz app, which held up through live TV traffic spikes.",
+          "Standardized CI/CD across 8 distinct architectures, replacing ad-hoc deploys, and mentored junior engineers on distributed-system design.",
+        ],
+        metrics: ["Distributed Systems", "CI/CD Standardization"],
+        tech: [
+          "NestJS",
+          "TypeScript",
+          "Redis",
+          "PostgreSQL",
+          "Solana",
+          "EVM",
+          "AWS",
+        ],
+      },
+      {
+        title: "Full-Stack Engineer",
+        org: "Xord",
+        period: "May 2022 - Mar 2023",
+        points: [
+          "Built Script TV, a watch-to-earn platform on EVM, end to end: the React / Next.js frontend, the backend indexing layer that processed millions of on-chain events into off-chain rewards, and the tokenomics smart contracts.",
+          "Profiled and rewrote PostgreSQL aggregation pipelines for a blockchain explorer using execution-plan analysis, materialized views, and caching to cut API latency.",
+          "Implemented OAuth / JWT authentication flows for enterprise clients.",
+        ],
+        metrics: ["Query Optimization", "System Performance"],
+        tech: ["React", "Next.js", "Node.js", "PostgreSQL", "Solidity"],
+      },
+    ],
   },
   {
     company: "Tezeract",
-    role: "Co-Founder & CTO",
-    period: "Dec 2020 -- May 2022",
     location: "Karachi, PK",
-    description:
-      "As Co-Founder, I led engineering strategy and mentored a team of 4 developers while personally architecting and leading development of the company's AI products: Formole, a venture-backed soccer coaching app that analyses a kick with pose estimation; Spintip, automated tennis highlight generation from raw match footage; Navex, face-recognition attendance for school buses built to run offline; MapApp, a wildfire exposure assessment tool over national geospatial data; and Duckends, gesture-based feedback capture. I also engineered financial integrations for an OTA platform processing $50k+ in monthly volume.",
-    metrics: ["Applied Computer Vision", "Engineering Leadership"],
-    tech: ["Python", "TensorFlow", "Computer Vision", "Geospatial", "AWS"],
+    roles: [
+      {
+        title: "Lead Engineer",
+        period: "Dec 2020 - May 2022",
+        points: [
+          "Led an engineering team of 4: hired and mentored the engineers, ran code reviews, and owned architecture and DevOps across client projects.",
+          "Architected and led development of the company's AI products: Formole, a venture-backed soccer coaching app that analyses a kick with pose estimation; Spintip, automated tennis highlight generation from raw match footage; Navex, face-recognition attendance for school buses built to run offline; MapApp, a wildfire exposure assessment tool over national geospatial data; and Duckends, gesture-controlled feedback kiosks deployed at Dubai Mall.",
+          "Architected the payment-reconciliation engine for an OTA platform processing $50k+ in monthly volume, wrapping legacy Sabre GDS APIs in a clean integration layer.",
+        ],
+        metrics: ["Applied Computer Vision", "Engineering Leadership"],
+        tech: ["Computer Vision", "TensorFlow", "Python", "Node.js", "AWS"],
+      },
+    ],
   },
   {
-    company: "Xehen",
-    role: "Lead MERN Stack Engineer",
-    period: "May 2020 -- Dec 2020",
+    company: "Xord",
     location: "Karachi, PK",
-    description:
-      "Led a backend engineering team to establish robust REST API standards and scalable database schemas. My architectural decisions laid the foundation for the platform to scale through its early growth phase, ensuring data consistency and query performance as load increased.",
-    metrics: ["API Standards", "Scalable Schema Design"],
-    tech: ["MongoDB", "Express", "React", "Node.js"],
+    roles: [
+      {
+        title: "Full-Stack Engineer",
+        period: "May 2020 - Dec 2020",
+        points: [
+          "Placed with client Xehen from Aug 2020 as lead engineer, establishing the frontend and backend architecture, API standards, and database schemas that supported the platform's early growth.",
+        ],
+        metrics: ["API Standards", "Scalable Schema Design"],
+        tech: ["MongoDB", "Express", "React", "Node.js"],
+      },
+    ],
   },
   {
-    company: "Edgeon Solutions",
-    role: "Frontend Developer",
-    period: "Jun 2019 -- May 2020",
+    company: "Edgeon",
     location: "Karachi, PK",
-    description:
-      "Focused on high-performance frontend architecture and state management. I collaborated closely with backend teams to design efficient API contracts and data synchronization patterns, ensuring seamless integration between complex user interfaces and server-side logic.",
-    metrics: ["Client-Server Arch", "API Integration"],
-    tech: ["React", "Redux", "JavaScript", "HTML/CSS"],
+    roles: [
+      {
+        title: "Frontend Developer",
+        period: "Jun 2019 - May 2020",
+        points: [
+          "Focused on high-performance frontend architecture and state management. I collaborated closely with backend teams to design efficient API contracts and data synchronization patterns, ensuring clean integration between complex user interfaces and server-side logic.",
+        ],
+        metrics: ["Client-Server Arch", "API Integration"],
+        tech: ["React", "Redux", "JavaScript", "HTML/CSS"],
+      },
+    ],
   },
 ];
 ---
@@ -65,35 +126,70 @@ const experiences = [
         <div class="group relative border-l-2 border-gray-200 pl-8 pb-2 hover:border-primary transition-colors duration-300">
           <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-gray-200 group-hover:bg-primary transition-colors duration-300 ring-4 ring-white" />
 
-          <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-2">
+          <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-1">
             <h4 class="text-xl font-bold text-secondary group-hover:text-primary transition-colors">
-              {exp.company}
+              {exp.url ? (
+                <a
+                  href={exp.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="hover:underline underline-offset-4"
+                >
+                  {exp.company}
+                </a>
+              ) : (
+                exp.company
+              )}
+              <span class="text-gray-500 text-sm font-normal ml-2">
+                • {exp.location}
+              </span>
             </h4>
-            <span class="text-sm text-gray-500 font-mono">{exp.period}</span>
+            {exp.period && (
+              <span class="text-sm text-gray-500 font-mono">{exp.period}</span>
+            )}
           </div>
 
-          <div class="mb-4">
-            <span class="text-lg text-gray-700 font-medium">{exp.role}</span>
-            <span class="text-gray-500 text-sm ml-2">• {exp.location}</span>
-          </div>
+          {exp.note && <p class="text-sm text-gray-500 mb-4">{exp.note}</p>}
 
-          <p class="text-gray-600 mb-4 leading-relaxed max-w-2xl">
-            {exp.description}
-          </p>
+          <div class="mt-4 space-y-8">
+            {exp.roles.map((role) => (
+              <div>
+                <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-3">
+                  <span class="text-lg text-gray-700 font-medium">
+                    {role.title}
+                    {role.org && (
+                      <span class="text-gray-500 text-sm ml-2">
+                        • {role.org}
+                      </span>
+                    )}
+                  </span>
+                  <span class="text-sm text-gray-500 font-mono">
+                    {role.period}
+                  </span>
+                </div>
 
-          <div class="flex flex-wrap gap-3 mb-4">
-            {exp.metrics.map((metric) => (
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-100">
-                {metric}
-              </span>
-            ))}
-          </div>
+                <ul class="text-gray-600 mb-4 leading-relaxed max-w-2xl space-y-2 list-disc pl-5 marker:text-gray-300">
+                  {role.points.map((point) => (
+                    <li>{point}</li>
+                  ))}
+                </ul>
 
-          <div class="flex flex-wrap gap-2">
-            {exp.tech.map((tech) => (
-              <span class="px-2 py-1 text-xs font-mono text-gray-500 bg-gray-50 border border-gray-100 rounded hover:border-gray-300 transition-colors cursor-default">
-                {tech}
-              </span>
+                <div class="flex flex-wrap gap-3 mb-4">
+                  {role.metrics.map((metric) => (
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-100">
+                      {metric}
+                    </span>
+                  ))}
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                  {role.tech.map((tech) => (
+                    <span class="px-2 py-1 text-xs font-mono text-gray-500 bg-gray-50 border border-gray-100 rounded hover:border-gray-300 transition-colors cursor-default">
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </div>

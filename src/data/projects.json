@@ -1,5 +1,198 @@
 [
     {
+        "slug": "zenapply-ai-autofill",
+        "project_name": "ZenApply",
+        "categories": [
+            "ai",
+            "consumer"
+        ],
+        "is_featured": true,
+        "live_url": "https://zenapply.app",
+        "role_note": "Only engineer on a three-person team. I built and run the whole stack solo: the browser extension, the NestJS backend and ingestion pipeline, the generation layer and the production infrastructure.",
+        "project_tagline": "A browser extension that ingests job listings at scale and auto-fills complex applications across 30+ ATS platforms, writing the free-text answers in the applicant's own voice.",
+        "domain_context": "Browser Extension / Productivity AI",
+        "tech_stack": [
+            "NestJS",
+            "BullMQ",
+            "React / Zustand",
+            "PostgreSQL",
+            "Chrome Extension (Manifest V3)",
+            "OpenAI GPT-4o",
+            "Google Gemini",
+            "Server-Sent Events (SSE)"
+        ],
+        "project_description": "Applying for jobs is repetitive data entry on top of a search problem, and ZenApply handles both. An ingestion pipeline pulls from 40+ external sources through background queues with per-source rate limiting, dedupe and enrichment, normalizing 25k+ job listings a day from sources with unstable schemas. On top of that sits the auto-fill engine, which handles 2k+ applications a day across 30+ ATS platforms. It completes ~100% of officially supported platforms and 80-90% of unsupported ones by reading each form's schema and constraining the model to valid answers. Deterministic fields fill instantly from a stored profile; open-ended ones stream back from the model over SSE, with a batch fallback. The generation layer goes further than field mapping: cover letters and free-text answers are written to a user-selected writing style, either learned from writing samples the user supplies or driven by direct prompt instructions.",
+        "architecture_overview": "Two halves that meet in one database. A NestJS service runs the ingestion side: BullMQ queues fan out to 40+ external sources, each with its own rate limit, dedupe key and enrichment step, normalizing 25k+ job listings a day without letting one flaky upstream stall the rest. The client side is a React browser extension on Manifest V3 service workers, scraping form schemas through Strategy Pattern adapters and driving 2k+ applications a day across 30+ ATS platforms. The same NestJS backend proxies model calls to sanitize prompts, protect API keys, and stream open-ended answers back over SSE.",
+        "key_challenges": [
+            {
+                "focus": "Ingestion From Sources That Change Underneath You",
+                "challenge": "Job listings come from 40+ external sources, none of which owe you a stable schema, a stable rate limit or a stable uptime. Pull them inline and a single slow or reshaped source stalls the whole refresh, and the same listing arrives three times under three different ids.",
+                "solution": "Every source runs as its own BullMQ job behind its own rate limiter, so a source that degrades slows only itself. Each record passes a dedupe key before enrichment, and parsing is written against what the source actually returns rather than what it documented, so a reshaped payload drops that record instead of failing the batch. That is what holds 25k+ normalized listings a day steady."
+            },
+            {
+                "focus": "Polymorphic DOM Scraping",
+                "challenge": "Every ATS renders forms differently. Some use standard `<input>`, others use `<div role='combobox'>` or shadow DOMs. Hardcoding selectors for every site is unscalable.",
+                "solution": "Implemented a 'Heuristic Detection Engine.' Instead of relying solely on CSS selectors, the extension analyzes the semantic structure (labels, ARIA roles, proximity). I used a Strategy Pattern where specific `PlatformAdapters` (e.g., `GreenhouseAdapter`) inject custom logic only when strict detection criteria are met, which let me cover the large majority of forms with generic logic and handle the rest with specialized overrides.",
+                "evidence": "detectors/orchestrator.js"
+            },
+            {
+                "focus": "Trusted Event Simulation",
+                "challenge": "Modern frameworks (React/Angular) ignore simple value updates (`input.value = 'text'`). If the user doesn't physically type, the internal state (Virtual DOM) doesn't update, and the form submits as empty.",
+                "solution": "Built a 'Human Simulator' module. Instead of setting values, it dispatches a precise sequence of synthetic events (`mousedown` → `focus` → `input` → `change` → `blur`) that mimics a real user. For React-controlled components, I reach into the React Fiber node instances to force state updates explicitly when synthetic events fail.",
+                "evidence": "fillers/react-select.js"
+            },
+            {
+                "focus": "Schema-Constrained Generation",
+                "challenge": "Mapping a Resume (Unstructured Text) to a Form (Strict Schema) is error-prone. The AI might hallucinate a 'Yes' for a 'Years of Experience' integer field.",
+                "solution": "Designed a two-stage Prompt Engineering pipeline. First, the extension scrapes the form schema (including dropdown options and validation regex). The prompt then injects the User Profile + Job Description + Form Schema. I enforce 'Strict JSON Output' mode so the model selects *only* valid options from the provided dropdown lists, preventing validation errors. Deterministic fields never reach the model at all: they fill instantly from the stored profile, and only open-ended answers are generated, streaming back over SSE with a batch fallback. Constraining the model to the form's own vocabulary is what gets completion to ~100% on officially supported platforms and 80-90% on unsupported ones, across 2k+ applications a day.",
+                "evidence": "ai.service.ts"
+            },
+            {
+                "focus": "Cross-Frame Injection",
+                "challenge": "Many career sites embed the actual application form inside an `iframe` (cross-origin), blocking the main extension script from accessing the fields due to browser security policies.",
+                "solution": "Built on the Chrome `webNavigation` API and Background Service Workers. The background worker maintains a registry of active frames. When the popup is clicked, it identifies the correct `frameId` containing the form and uses `chrome.tabs.sendMessage` to inject the content script directly into that specific child frame context.",
+                "evidence": "background.js"
+            },
+            {
+                "focus": "Separating Voice from Format",
+                "challenge": "Users pick a writing style: upload writing samples that get analysed to extract their voice, write direct prompt instructions, or fall back to a default style. The naive implementation treats a style as one opaque blob of instructions and injects it into every generation call. That breaks immediately, because a style actually contains two different kinds of rule. Voice, meaning vocabulary, sentence rhythm and how formal the register is, should apply everywhere. Format, meaning greeting, sign-off, target word count and paragraph structure, belongs to cover letters only. Ship them as one blob and the format rules leak into short free-text answers, so 'Why do you want to work here?' comes back as a letter that opens with 'Hi team,' and signs off with the applicant's name.",
+                "solution": "Split the extracted style into two independently addressable parts and let each generation surface request only what it needs. Sample analysis writes voice attributes and format attributes into separate fields rather than one instruction string, and the free-text answer path composes a prompt from voice alone while the cover letter path composes from both. Generation runs at temperature 0, so the same job posting plus the same style produces the same output, which is what makes the two style modes (learned-from-samples versus direct instructions) comparable against each other instead of a matter of taste."
+            }
+        ]
+    },
+    {
+        "slug": "midl-p2p-exchange",
+        "project_name": "Midl",
+        "categories": [
+            "financial"
+        ],
+        "is_featured": true,
+        "project_tagline": "A decentralized P2P exchange enabling crypto on/off-ramping for any fiat currency via collateralized custodians.",
+        "domain_context": "DeFi / P2P Exchange",
+        "tech_stack": [
+            "NestJS",
+            "MongoDB (UTXO Modeling)",
+            "Alacrity (EOSIO Fork)",
+            "Socket.io",
+            "AWS KMS",
+            "React"
+        ],
+        "project_description": "Midl is a P2P bridge that allows users to move between Crypto and Fiat without a centralized exchange. It relies on a network of 'Custodians' who stake capital to fulfill orders. Unlike standard AMMs, Midl tracks the specific lineage of every token minted. If a user on-ramps $100, they own that specific 'Batch' of tokens. When those tokens are transferred, fees are routed back to the original facilitator. This required building a complex UTXO-style ledger in MongoDB synced to a custom high-speed blockchain, with distributed locking and idempotency throughout the payment path so 10,000+ concurrent users never produce a dropped or duplicated transaction.",
+        "architecture_overview": "A hybrid Event-Sourced architecture sized for 10,000+ concurrent users. The blockchain handles custody and dispute resolution, while a NestJS backend implements a custom UTXO indexer to track asset provenance and fee splits.",
+        "key_challenges": [
+            {
+                "focus": "The 'Phantom Event' Pattern",
+                "challenge": "The underlying blockchain (Alacrity/EOSIO) does not support native event emission (like Solidity's `emit`). We needed a way for the backend to react instantly to on-chain actions (Trades, Disputes) without brutally polling the entire block state.",
+                "solution": "Engineered a 'Side-Effect Contract' pattern. Whenever a main contract executed a critical action, it made an inline call to a separate, hollow 'Logger Contract' with structured data. Our indexer listened specifically for interactions with this Logger address, effectively synthesizing an event log on a chain that didn't support one.",
+                "evidence": "IndexerUtils.ts / LoggerContract.cpp"
+            },
+            {
+                "focus": "UTXO Fee Lineage",
+                "challenge": "The business logic required a 'Sticky Fee' model: A $0.20 transfer fee had to be split between the platform and the *specific* custodian who originally facilitated the minting of those tokens, even after the tokens had changed hands 50 times.",
+                "solution": "Rejected a simple 'Account Balance' model in favor of a full UTXO (Unspent Transaction Output) architecture within MongoDB. Every token unit is tracked as a unique `Batch` document with a `previousBatchId`. When a transfer happens, we traverse the graph backward to identify the original `facilitator` and route the fee correctly.",
+                "evidence": "batch.schema.ts / batch.service.ts"
+            },
+            {
+                "focus": "Collateralized Order Matching",
+                "challenge": "Custodians could only accept orders up to 80% of their staked liquid capital. We needed a real-time matching engine that wouldn't allow race conditions (e.g., two users claiming the same custodian liquidity simultaneously).",
+                "solution": "Implemented a dual-layer lock. On-chain, the `createreqdep` action atomically moves funds from `free_amount` to `tied_amount`. Off-chain, the NestJS matcher uses MongoDB transactional sessions to reserve liquidity before broadcasting the 'Match Found' event via authenticated WebSockets. Every write on the payment path is idempotent and guarded by a distributed lock, which is what holds the ledger consistent at 10,000+ concurrent users.",
+                "evidence": "transaction.service.ts"
+            },
+            {
+                "focus": "Trustless Dispute Resolution",
+                "challenge": "Since this is P2P, users can lie about sending fiat. We needed a decentralized way to resolve 'He said, She said' conflicts without a centralized admin key.",
+                "solution": "Built a 4-phase on-chain judicial system (`Regular` → `Dispute` → `Appeal` → `Resolved`). Randomly selected 'Jury' users stake tokens to vote on evidence. The smart contract holds the disputed funds and programmatically slashes the loser's stake to pay the winner and the jury, ensuring economic alignment.",
+                "evidence": "midl.cpp (resolve / opendispute)"
+            }
+        ]
+    },
+    {
+        "slug": "handle-pay-smart-wallet",
+        "project_name": "Handle Pay",
+        "categories": [
+            "financial"
+        ],
+        "is_featured": true,
+        "project_tagline": "A seedless, gasless, multi-chain smart wallet powered by Biometric Passkeys and Account Abstraction.",
+        "domain_context": "Consumer FinTech / Web3 UX",
+        "tech_stack": [
+            "React Native (Expo)",
+            "NestJS",
+            "WebAuthn / Passkeys",
+            "ZeroDev (ERC-4337)",
+            "LazorKit (Solana)",
+            "Redis",
+            "BullMQ"
+        ],
+        "project_description": "Crypto adoption is stalled by 'Seed Phrase Anxiety' and 'Gas Fees.' Handle Pay was designed to remove both: a self-custodial wallet that replaces 12-word seed phrases with standard Biometric Passkeys (FaceID/TouchID). Under the hood, it spins up Smart Accounts (ERC-4337 on EVM, PDAs on Solana) that are controlled by the user's device security enclave. We integrated Paymasters to sponsor gas fees, so the design target was a 'Chain Abstracted' experience: send money without knowing which blockchain you are on.",
+        "architecture_overview": "A modular NestJS monolith that acts as a 'Smart Account Factory,' deriving deterministic multi-chain addresses from a single WebAuthn credential and orchestrating gasless transactions via Paymaster relays.",
+        "key_challenges": [
+            {
+                "focus": "Unified Multi-Chain Identity",
+                "challenge": "We needed a single Passkey (FaceID) to control wallets on completely different cryptographic curves: EVM (secp256k1) and Solana (ed25519). Standard WebAuthn only gives one public key.",
+                "solution": "Engineered a deterministic derivation pipeline. For EVM, we used ZeroDev to create a Kernel Smart Account controlled by the WebAuthn key. For Solana, we hashed the Credential ID to derive a PDA via LazorKit. One 'Login with FaceID' therefore yields synchronized addresses on Ethereum and Solana from a single credential.",
+                "evidence": "wallet.service.ts"
+            },
+            {
+                "focus": "Biometric Transaction Signing",
+                "challenge": "Passkeys are typically used for *login*, not *authorizing specific financial transactions*. We needed to prevent replay attacks where a valid login signature is re-used to drain funds.",
+                "solution": "Customized the WebAuthn challenge flow. Instead of a random nonce, we inject the `keccak256` hash of the transaction data (calldata) into the WebAuthn challenge. The user's biometric signature thus cryptographically commits to *that specific transaction*, making replay attacks impossible.",
+                "evidence": "verifyTransactionSignature()"
+            },
+            {
+                "focus": "Username Race Conditions",
+                "challenge": "We allowed users to claim unique `@usernames` (like Venmo). High concurrency during onboarding meant two users could pass validation simultaneously, leading to database collisions.",
+                "solution": "Implemented a 'Two-Phase Commit' reservation system using Redis and MongoDB TTL indexes. The username is atomically 'locked' for 30 minutes upon the first check. The WebAuthn registration options are only generated *after* a successful lock is acquired. If the passkey creation fails, the lock auto-expires.",
+                "evidence": "onboarding.service.ts"
+            },
+            {
+                "focus": "Gas Abstraction",
+                "challenge": "Users shouldn't need to hold ETH or SOL just to pay for a coffee. Managing gas fees for them is complex.",
+                "solution": "Integrated ERC-4337 Paymasters. The backend calculates the gas cost, communicates with the Paymaster service to sponsor the transaction, and executes the UserOp. The intended result is an app that behaves like a standard banking app, with no 'Insufficient ETH for Gas' errors.",
+                "evidence": "paymaster.service.ts"
+            }
+        ],
+        "role_note": "Built at BlockApex. Handle Pay has not launched: this case study covers the backend I designed and built, not a shipped product."
+    },
+    {
+        "slug": "ghost-pay-private-payments",
+        "project_name": "Ghost Pay",
+        "categories": [
+            "financial"
+        ],
+        "is_featured": true,
+        "live_url": "https://ghost-pay.nabeelkhan.dev",
+        "repo_url": "https://github.com/n4beel/ghost-pay",
+        "role_note": "Built solo for the Superteam Frontier Hackathon 2026.",
+        "project_tagline": "A privacy-first payments app live on Solana mainnet: shielded vaults, proof-backed transfers, and viewing keys for the people who still need to see the books.",
+        "domain_context": "Privacy Payments / Solana",
+        "tech_stack": [
+            "Next.js",
+            "Solana",
+            "Solana Wallet Adapter",
+            "Zero-Knowledge Proofs"
+        ],
+        "project_description": "A privacy-first payments app, live on Solana mainnet, built solo for the Superteam Frontier Hackathon 2026. Funds sit in shielded vaults and leave them through ZK-proof transfers, with stealth UTXO claims on the receiving side. Around that core sit the things that make it usable as an actual payments app rather than a privacy demo: paying a .sol name instead of a base58 address, shareable payment links, CSV payroll for paying a list of people in one pass, and viewing keys that hand an auditor read-only access.",
+        "architecture_overview": "A Next.js frontend talking to Solana mainnet through the wallet adapter, with the privacy layer built on top: shielded vaults hold balances, transfers out are authorised by zero-knowledge proof, and recipients claim through stealth UTXOs. Viewing keys are issued separately from spending authority, which is what lets an auditor read an account without being able to move anything in it.",
+        "key_challenges": [
+            {
+                "focus": "Spending Without Publishing the Ledger",
+                "challenge": "Solana is a public ledger. A payments app built directly on it exposes every balance and every counterparty by default, which rules it out for payroll or anything else a user would consider private.",
+                "solution": "Balances live in shielded vaults rather than in a plain token account, and leaving a vault goes through a zero-knowledge proof instead of an ordinary transfer. The receiving side claims through stealth UTXOs, so neither end of a payment has to be readable to settle it."
+            },
+            {
+                "focus": "Paying People, Not Addresses",
+                "challenge": "A base58 address is unusable for everyday payments, and it gets worse when the job is paying a list of people rather than one person.",
+                "solution": "Payments resolve .sol names, so a recipient is a name instead of a 44-character string, and payment links cover the case where the sender has no address at all. For a list, CSV payroll runs the whole batch in one pass."
+            },
+            {
+                "focus": "Privacy That Still Allows an Audit",
+                "challenge": "A wallet that nobody can read is unusable for anyone who has to show their books to an accountant, an auditor or a business partner. Privacy that forces you to hand over your keys is not privacy.",
+                "solution": "Viewing keys separate the ability to read an account from the ability to spend from it. Issuing one gives a third party read-only visibility into the account's activity, and nothing else."
+            }
+        ]
+    },
+    {
         "slug": "tokenomics-agent-content-system",
         "project_name": "Tokenomics Content System",
         "categories": [
@@ -74,7 +267,7 @@
         "key_challenges": [
             {
                 "focus": "The Pivot: Regex vs. AST",
-                "challenge": "We initially built the analyzer in Node.js using Regex, but it failed catastrophically on Anchor's heavy use of Rust macros (e.g., `#[derive(Accounts)]`). We faced a 40%+ false positive rate because Regex could not understand the semantic relationship between nested structs and instruction handlers.",
+                "challenge": "We initially built the analyzer in Node.js using Regex, but it failed catastrophically on Anchor's heavy use of Rust macros (e.g., `#[derive(Accounts)]`). That regex baseline ran at a 40%+ false positive rate, because Regex could not understand the semantic relationship between nested structs and instruction handlers.",
                 "solution": "We scrapped the Node.js engine and rewrote the core in Rust using the `syn` crate. We implemented a Visitor Pattern to traverse the raw Abstract Syntax Tree. This allowed us to semantically parse macro expansions and control flow, dropping false positives to near zero and enabling deep dependency graph analysis.",
                 "evidence": "analyzer/src/visitor.rs"
             },
@@ -135,7 +328,7 @@
             "Server-Sent Events (SSE)",
             "MongoDB"
         ],
-        "project_description": "Most Web3 hacks don't happen in the smart contract. They happen in the frontend (e.g., compromised NPM packages or DNS hijacks). Nxellent is a comprehensive auditing platform that analyzes the *entire* dApp stack. It combines on-chain analysis (Solana program authorities) with off-chain scanning (Next.js/React vulnerabilities) to generate a unified 'Shield Score.' It provides two distinct dashboards: a detailed technical view for Founders to fix bugs, and a high-level risk summary for Investors doing due diligence.",
+        "project_description": "Most Web3 hacks don't happen in the smart contract. They happen in the frontend (e.g., compromised NPM packages or DNS hijacks). Nxellent is a comprehensive auditing platform that analyzes the *entire* dApp stack. It combines on-chain analysis (Solana program authorities) with off-chain scanning (Next.js/React vulnerabilities) to generate a unified 'Shield Score.' It provides two distinct dashboards: a detailed technical view for engineering teams to fix bugs, and a high-level risk summary for Investors doing due diligence.",
         "architecture_overview": "An event-driven distributed system built around a trust boundary. A NestJS API accepts scan requests and does no analysis itself; it enqueues jobs onto BullMQ and returns immediately. A separate pool of worker processes, deployed on their own VM rather than alongside the API, consumes the queue and spawns a hardened, single-use Docker container per job to execute untrusted project code. Results flow back through Redis Pub/Sub into Server-Sent Events, so the browser sees progress without polling.",
         "key_challenges": [
             {
@@ -157,7 +350,7 @@
             },
             {
                 "focus": "Normalizing Across Two Paradigms",
-                "challenge": "We had to quantify risk across Rust/Anchor program logic and JavaScript/React frontend code, two ecosystems whose findings share no severity scale, no tooling and no common notion of what 'critical' means. Averaging them produces the exact failure the product exists to prevent: a clean contract masking an insecure frontend, presented as a healthy overall grade.",
+                "challenge": "We had to quantify risk across Anchor program logic and JavaScript/React frontend code, two ecosystems whose findings share no severity scale, no tooling and no common notion of what 'critical' means. Averaging them produces the exact failure the product exists to prevent: a clean contract masking an insecure frontend, presented as a healthy overall grade.",
                 "solution": "A weighted normalization layer ingests raw signals from Semgrep on the frontend and custom on-chain probes on the Solana side, mapping both into a shared severity vocabulary before any arithmetic happens. On top of that sits a criticality rule that overrides the weighting: a single critical finding on either side caps the total project grade at a D no matter how clean the other side is. The cap exists precisely because a weighted average is mathematically reasonable and, here, produces a dangerous answer.",
                 "evidence": "scoring.service.ts"
             },
@@ -172,153 +365,6 @@
                 "challenge": "Since scans run in background workers, the frontend had no way of knowing when a job finished without polling the API every second.",
                 "solution": "Built a Redis Pub/Sub bridge. When an isolated worker finishes a stage it publishes to a Redis channel. The API server subscribes and pushes the update to the client over Server-Sent Events, which suits a one-way progress stream better than a WebSocket and survives reconnection without extra bookkeeping. The result is a live scan log with no client-side polling.",
                 "evidence": "notifications-pubsub.service.ts"
-            }
-        ]
-    },
-    {
-        "slug": "midl-p2p-exchange",
-        "project_name": "Midl",
-        "categories": [
-            "financial"
-        ],
-        "is_featured": true,
-        "project_tagline": "A decentralized P2P exchange enabling crypto on/off-ramping for any fiat currency via collateralized custodians.",
-        "domain_context": "DeFi / P2P Exchange",
-        "tech_stack": [
-            "NestJS",
-            "MongoDB (UTXO Modeling)",
-            "Alacrity (EOSIO Fork)",
-            "Socket.io",
-            "AWS KMS",
-            "React"
-        ],
-        "project_description": "Midl is a P2P bridge that allows users to move between Crypto and Fiat without a centralized exchange. It relies on a network of 'Custodians' who stake capital to fulfill orders. Unlike standard AMMs, Midl tracks the specific lineage of every token minted. If a user on-ramps $100, they own that specific 'Batch' of tokens. When those tokens are transferred, fees are routed back to the original facilitator. This required building a complex UTXO-style ledger in MongoDB synced to a custom high-speed blockchain.",
-        "architecture_overview": "A hybrid Event-Sourced architecture. The blockchain handles custody and dispute resolution, while a NestJS backend implements a custom UTXO indexer to track asset provenance and fee splits.",
-        "key_challenges": [
-            {
-                "focus": "The 'Phantom Event' Pattern",
-                "challenge": "The underlying blockchain (Alacrity/EOSIO) does not support native event emission (like Solidity's `emit`). We needed a way for the backend to react instantly to on-chain actions (Trades, Disputes) without brutally polling the entire block state.",
-                "solution": "Engineered a 'Side-Effect Contract' pattern. Whenever a main contract executed a critical action, it made an inline call to a separate, hollow 'Logger Contract' with structured data. Our indexer listened specifically for interactions with this Logger address, effectively synthesizing an event log on a chain that didn't support one.",
-                "evidence": "IndexerUtils.ts / LoggerContract.cpp"
-            },
-            {
-                "focus": "UTXO Fee Lineage",
-                "challenge": "The business logic required a 'Sticky Fee' model: A $0.20 transfer fee had to be split between the platform and the *specific* custodian who originally facilitated the minting of those tokens, even after the tokens had changed hands 50 times.",
-                "solution": "Rejected a simple 'Account Balance' model in favor of a full UTXO (Unspent Transaction Output) architecture within MongoDB. Every token unit is tracked as a unique `Batch` document with a `previousBatchId`. When a transfer happens, we traverse the graph backward to identify the original `facilitator` and route the fee correctly.",
-                "evidence": "batch.schema.ts / batch.service.ts"
-            },
-            {
-                "focus": "Collateralized Order Matching",
-                "challenge": "Custodians could only accept orders up to 80% of their staked liquid capital. We needed a real-time matching engine that wouldn't allow race conditions (e.g., two users claiming the same custodian liquidity simultaneously).",
-                "solution": "Implemented a dual-layer lock. On-chain, the `createreqdep` action atomically moves funds from `free_amount` to `tied_amount`. Off-chain, the NestJS matcher uses MongoDB transactional sessions to reserve liquidity before broadcasting the 'Match Found' event via authenticated WebSockets.",
-                "evidence": "transaction.service.ts"
-            },
-            {
-                "focus": "Trustless Dispute Resolution",
-                "challenge": "Since this is P2P, users can lie about sending fiat. We needed a decentralized way to resolve 'He said, She said' conflicts without a centralized admin key.",
-                "solution": "Built a 4-phase on-chain judicial system (`Regular` → `Dispute` → `Appeal` → `Resolved`). Randomly selected 'Jury' users stake tokens to vote on evidence. The smart contract holds the disputed funds and programmatically slashes the loser's stake to pay the winner and the jury, ensuring economic alignment.",
-                "evidence": "midl.cpp (resolve / opendispute)"
-            }
-        ]
-    },
-    {
-        "slug": "zenapply-ai-autofill",
-        "project_name": "ZenApply",
-        "categories": [
-            "ai",
-            "consumer"
-        ],
-        "is_featured": true,
-        "live_url": "https://zenapply.app",
-        "role_note": "Sole engineer on a three-person founding team. The entire technical stack (Chrome extension, NestJS backend, generation pipeline and database) was designed and built by me.",
-        "project_tagline": "A Chrome extension that scrapes, maps, and autofills complex job applications across 19+ ATS platforms, and writes the free-text answers in the applicant's own voice.",
-        "domain_context": "Browser Extension / Productivity AI",
-        "tech_stack": [
-            "Chrome Extension (Manifest V3)",
-            "OpenAI GPT-4o",
-            "NestJS",
-            "React / Zustand",
-            "PostgreSQL",
-            "Google Gemini"
-        ],
-        "project_description": "Applying for jobs is repetitive data entry. ZenApply automates it by acting as an agent inside the browser. It detects job application forms (Greenhouse, Lever, Workday, etc.), scrapes the schema (labels, types, validation rules), and uses a Large Language Model to map the user's resume data to the specific fields. It then injects the data using trusted DOM events so the application state persists. The generation layer goes further than field mapping: cover letters and free-text answers are written to a user-selected writing style, either learned from writing samples the user supplies or driven by direct prompt instructions.",
-        "architecture_overview": "A heavy client-side architecture using Manifest V3 Service Workers for orchestration. Content scripts scrape DOMs using Strategy Pattern adapters, while a NestJS backend proxies AI requests to sanitize prompts and protect API keys.",
-        "key_challenges": [
-            {
-                "focus": "Polymorphic DOM Scraping",
-                "challenge": "Every ATS renders forms differently. Some use standard `<input>`, others use `<div role='combobox'>` or shadow DOMs. Hardcoding selectors for every site is unscalable.",
-                "solution": "Implemented a 'Heuristic Detection Engine.' Instead of relying solely on CSS selectors, the extension analyzes the semantic structure (labels, ARIA roles, proximity). I used a Strategy Pattern where specific `PlatformAdapters` (e.g., `GreenhouseAdapter`) inject custom logic only when strict detection criteria are met, which let me cover the large majority of forms with generic logic and handle the rest with specialized overrides.",
-                "evidence": "detectors/orchestrator.js"
-            },
-            {
-                "focus": "Trusted Event Simulation",
-                "challenge": "Modern frameworks (React/Angular) ignore simple value updates (`input.value = 'text'`). If the user doesn't physically type, the internal state (Virtual DOM) doesn't update, and the form submits as empty.",
-                "solution": "Built a 'Human Simulator' module. Instead of setting values, it dispatches a precise sequence of synthetic events (`mousedown` → `focus` → `input` → `change` → `blur`) that mimics a real user. For React-controlled components, I reach into the React Fiber node instances to force state updates explicitly when synthetic events fail.",
-                "evidence": "fillers/react-select.js"
-            },
-            {
-                "focus": "Context-Aware AI Mapping",
-                "challenge": "Mapping a Resume (Unstructured Text) to a Form (Strict Schema) is error-prone. The AI might hallucinate a 'Yes' for a 'Years of Experience' integer field.",
-                "solution": "Designed a two-stage Prompt Engineering pipeline. First, the extension scrapes the form schema (including dropdown options and validation regex). The prompt then injects the User Profile + Job Description + Form Schema. I enforce 'Strict JSON Output' mode so the model selects *only* valid options from the provided dropdown lists, preventing validation errors.",
-                "evidence": "ai.service.ts"
-            },
-            {
-                "focus": "Cross-Frame Injection",
-                "challenge": "Many career sites embed the actual application form inside an `iframe` (cross-origin), blocking the main extension script from accessing the fields due to browser security policies.",
-                "solution": "Built on the Chrome `webNavigation` API and Background Service Workers. The background worker maintains a registry of active frames. When the popup is clicked, it identifies the correct `frameId` containing the form and uses `chrome.tabs.sendMessage` to inject the content script directly into that specific child frame context.",
-                "evidence": "background.js"
-            },
-            {
-                "focus": "Separating Voice from Format",
-                "challenge": "Users pick a writing style: upload writing samples that get analysed to extract their voice, write direct prompt instructions, or fall back to a default style. The naive implementation treats a style as one opaque blob of instructions and injects it into every generation call. That breaks immediately, because a style actually contains two different kinds of rule. Voice, meaning vocabulary, sentence rhythm and how formal the register is, should apply everywhere. Format, meaning greeting, sign-off, target word count and paragraph structure, belongs to cover letters only. Ship them as one blob and the format rules leak into short free-text answers, so 'Why do you want to work here?' comes back as a letter that opens with 'Hi team,' and signs off with the applicant's name.",
-                "solution": "Split the extracted style into two independently addressable parts and let each generation surface request only what it needs. Sample analysis writes voice attributes and format attributes into separate fields rather than one instruction string, and the free-text answer path composes a prompt from voice alone while the cover letter path composes from both. Generation runs at temperature 0, so the same job posting plus the same style produces the same output, which is what makes the two style modes (learned-from-samples versus direct instructions) comparable against each other instead of a matter of taste."
-            }
-        ]
-    },
-    {
-        "slug": "handle-pay-smart-wallet",
-        "project_name": "Handle Pay",
-        "categories": [
-            "financial"
-        ],
-        "is_featured": false,
-        "project_tagline": "A seedless, gasless, multi-chain smart wallet powered by Biometric Passkeys and Account Abstraction.",
-        "domain_context": "Consumer FinTech / Web3 UX",
-        "tech_stack": [
-            "React Native (Expo)",
-            "NestJS",
-            "WebAuthn / Passkeys",
-            "ZeroDev (ERC-4337)",
-            "LazorKit (Solana)",
-            "Redis",
-            "BullMQ"
-        ],
-        "project_description": "Crypto adoption is stalled by 'Seed Phrase Anxiety' and 'Gas Fees.' Handle Pay removes both. It is a self-custodial wallet that replaces 12-word seed phrases with standard Biometric Passkeys (FaceID/TouchID). Under the hood, it spins up Smart Accounts (ERC-4337 on EVM, PDAs on Solana) that are controlled by the user's device security enclave. We integrated Paymasters to sponsor gas fees, creating a 'Chain Abstracted' experience where users send money without knowing which blockchain they are on.",
-        "architecture_overview": "A modular NestJS monolith that acts as a 'Smart Account Factory,' deriving deterministic multi-chain addresses from a single WebAuthn credential and orchestrating gasless transactions via Paymaster relays.",
-        "key_challenges": [
-            {
-                "focus": "Unified Multi-Chain Identity",
-                "challenge": "We needed a single Passkey (FaceID) to control wallets on completely different cryptographic curves: EVM (secp256k1) and Solana (ed25519). Standard WebAuthn only gives one public key.",
-                "solution": "Engineered a deterministic derivation pipeline. For EVM, we used ZeroDev to create a Kernel Smart Account controlled by the WebAuthn key. For Solana, we hashed the Credential ID to derive a PDA via LazorKit. This allows a user to 'Login with FaceID' and instantly have synchronized addresses on Ethereum and Solana from one credential.",
-                "evidence": "wallet.service.ts"
-            },
-            {
-                "focus": "Biometric Transaction Signing",
-                "challenge": "Passkeys are typically used for *login*, not *authorizing specific financial transactions*. We needed to prevent replay attacks where a valid login signature is re-used to drain funds.",
-                "solution": "Customized the WebAuthn challenge flow. Instead of a random nonce, we inject the `keccak256` hash of the transaction data (calldata) into the WebAuthn challenge. The user's biometric signature thus cryptographically commits to *that specific transaction*, making replay attacks impossible.",
-                "evidence": "verifyTransactionSignature()"
-            },
-            {
-                "focus": "Username Race Conditions",
-                "challenge": "We allowed users to claim unique `@usernames` (like Venmo). High concurrency during onboarding meant two users could pass validation simultaneously, leading to database collisions.",
-                "solution": "Implemented a 'Two-Phase Commit' reservation system using Redis and MongoDB TTL indexes. The username is atomically 'locked' for 30 minutes upon the first check. The WebAuthn registration options are only generated *after* a successful lock is acquired. If the passkey creation fails, the lock auto-expires.",
-                "evidence": "onboarding.service.ts"
-            },
-            {
-                "focus": "Gas Abstraction",
-                "challenge": "Users shouldn't need to hold ETH or SOL just to pay for a coffee. Managing gas fees for them is complex.",
-                "solution": "Integrated ERC-4337 Paymasters. The backend calculates the gas cost, communicates with the Paymaster service to sponsor the transaction, and executes the UserOp. To the user, the app feels like a standard banking app, with no 'Insufficient ETH for Gas' errors ever.",
-                "evidence": "paymaster.service.ts"
             }
         ]
     },
@@ -381,7 +427,6 @@
         "tech_stack": [
             "NestJS",
             "Solidity (Foundry)",
-            "Rust",
             "Redis (Binary Search Trees)",
             "The Graph",
             "WebSockets",
@@ -434,7 +479,7 @@
             "Ethers.js"
         ],
         "project_description": "Built for the massive audience of Gran Hermano (Big Brother), CTV is a 'Second Screen' trivia app that runs in sync with the live broadcast. Viewers answer questions about the episode in real-time to earn tokens. The challenge was onboarding non-crypto natives ('Normies'). We used Web3Auth to allow social login (Google/Facebook) while silently generating a non-custodial wallet in the background, bridging the gap between Web2 UX and Web3 rewards.",
-        "architecture_overview": "A monolithic NestJS backend designed for burst traffic. It uses advanced MongoDB Aggregation Pipelines to calculate 'Time-Windowed' question availability relative to the server clock, ensuring all viewers see the same question at the exact same moment without race conditions.",
+        "architecture_overview": "A monolithic NestJS backend designed for burst traffic, which held up through live TV traffic spikes. It uses advanced MongoDB Aggregation Pipelines to calculate 'Time-Windowed' question availability relative to the server clock, ensuring all viewers see the same question at the exact same moment without race conditions.",
         "key_challenges": [
             {
                 "focus": "Invisible Web3 Onboarding",
@@ -783,7 +828,7 @@
         ],
         "is_featured": false,
         "live_url": "https://tezeract.ai/ai-case-studies/formole-ai-based-virtual-sports-coaching-app/",
-        "role_note": "Built at Tezeract, where I was Co-Founder & CTO. I architected and developed this product personally: the AI pipeline, the backend and the system design.",
+        "role_note": "Built at Tezeract, where I was Lead Engineer. I architected and developed this product personally: the AI pipeline, the backend and the system design.",
         "project_tagline": "A virtual soccer coaching app that analyses a phone-recorded kick with pose estimation and returns the kind of correction a coach would give.",
         "domain_context": "Computer Vision / Sports Technology",
         "tech_stack": [
@@ -822,7 +867,7 @@
         ],
         "is_featured": false,
         "live_url": "https://tezeract.ai/ai-case-studies/spintip-sports-highlight-video-maker/",
-        "role_note": "Built at Tezeract, where I was Co-Founder & CTO. I architected and developed this product personally: the AI pipeline, the backend and the system design.",
+        "role_note": "Built at Tezeract, where I was Lead Engineer. I architected and developed this product personally: the AI pipeline, the backend and the system design.",
         "project_tagline": "Automatic tennis highlight generation: object detection segments a match into rallies, and the cut is assembled from play, not from a person scrubbing a timeline.",
         "domain_context": "Computer Vision / Video Processing",
         "tech_stack": [
@@ -861,7 +906,7 @@
         ],
         "is_featured": false,
         "live_url": "https://tezeract.ai/ai-case-studies/navex-ai-powered-student-attendance-system/",
-        "role_note": "Built at Tezeract, where I was Co-Founder & CTO. I architected and developed this product personally: the AI pipeline, the backend and the system design.",
+        "role_note": "Built at Tezeract, where I was Lead Engineer. I architected and developed this product personally: the AI pipeline, the backend and the system design.",
         "project_tagline": "Face-recognition attendance for school buses, built to work in the worst possible conditions for face recognition and to keep working when the network does not.",
         "domain_context": "Computer Vision / EdTech Safety Systems",
         "tech_stack": [
@@ -901,7 +946,7 @@
         ],
         "is_featured": false,
         "live_url": "https://tezeract.ai/ai-case-studies/mapapp-ai-wildfire-risk-assessment-app/",
-        "role_note": "Built at Tezeract, where I was Co-Founder & CTO. I architected and developed this product personally: the AI pipeline, the backend and the system design.",
+        "role_note": "Built at Tezeract, where I was Lead Engineer. I architected and developed this product personally: the AI pipeline, the backend and the system design.",
         "project_tagline": "Wildfire exposure assessment for Canadian properties: country-scale raster risk layers made interactive in a browser, with an escape-time estimate attached to a specific address.",
         "domain_context": "Geospatial AI / Risk Assessment",
         "tech_stack": [
@@ -939,7 +984,7 @@
             "ai"
         ],
         "is_featured": false,
-        "role_note": "Built at Tezeract, where I was Co-Founder & CTO. I architected and developed this product personally: the AI pipeline, the backend and the system design.",
+        "role_note": "Built at Tezeract, where I was Lead Engineer. I architected and developed this product personally: the AI pipeline, the backend and the system design.",
         "project_tagline": "Feedback collection with no form and no button: real-time custom object detection reads a thumbs-up or thumbs-down from a camera feed.",
         "domain_context": "Computer Vision / Human-Computer Interaction",
         "tech_stack": [

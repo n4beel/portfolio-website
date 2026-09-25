@@ -8,9 +8,65 @@ interface Props {
 }
 
 const DEFAULT_DESCRIPTION =
-	"Nabeel Ahmed Khan - Senior Backend Engineer building distributed backend systems and AI automation.";
+	"Nabeel Ahmed Khan, Senior Full-Stack Engineer building fintech, Web3, and AI-powered products in TypeScript, React, and NestJS.";
 
 const { title, description = DEFAULT_DESCRIPTION } = Astro.props;
+
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site ?? 'https://nabeelkhan.dev');
+
+const personSchema = {
+	"@context": "https://schema.org",
+	"@type": "Person",
+	name: "Nabeel Ahmed Khan",
+	jobTitle: "Senior Full-Stack Engineer",
+	description: DEFAULT_DESCRIPTION,
+	url: "https://nabeelkhan.dev",
+	email: "mailto:contact@nabeelkhan.dev",
+	address: {
+		"@type": "PostalAddress",
+		addressLocality: "Karachi",
+		addressCountry: "PK",
+	},
+	worksFor: {
+		"@type": "Organization",
+		name: "ZenApply",
+		url: "https://zenapply.app",
+	},
+	alumniOf: [
+		{
+			"@type": "CollegeOrUniversity",
+			name: "Virtual University of Pakistan",
+		},
+		{
+			"@type": "CollegeOrUniversity",
+			name: "University of Karachi (UBIT)",
+		},
+	],
+	knowsAbout: [
+		"TypeScript",
+		"React",
+		"Next.js",
+		"React Native",
+		"Node.js",
+		"NestJS",
+		"PostgreSQL",
+		"MongoDB",
+		"Redis",
+		"AWS",
+		"Docker",
+		"Kubernetes",
+		"Distributed Systems",
+		"Payments Infrastructure",
+		"Web3",
+		"LLM Integration",
+	],
+	sameAs: [
+		"https://github.com/n4beel",
+		"https://linkedin.com/in/nabeel-a-khan",
+		"https://x.com/n4beel1",
+		"https://earn.superteam.fun/t/n4beel",
+	],
+};
 ---
 
 <!doctype html>
@@ -20,11 +76,26 @@ const { title, description = DEFAULT_DESCRIPTION } = Astro.props;
 		<meta name="description" content={description} />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="canonical" href={canonicalUrl.href} />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
+
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="Nabeel Ahmed Khan" />
+		<meta property="og:url" content={canonicalUrl.href} />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+
+		<meta name="twitter:card" content="summary" />
+		<meta name="twitter:site" content="@n4beel1" />
+		<meta name="twitter:creator" content="@n4beel1" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+		<script type="application/ld+json" set:html={JSON.stringify(personSchema)} is:inline />
 		<ViewTransitions />
 	</head>
 	<body class="bg-background text-secondary font-sans antialiased">

@@ -6,17 +6,18 @@ import ProjectLinks from "./ProjectLinks.jsx";
 const FEATURED_LIMIT = 4;
 
 export default function FeaturedProjects({ allProjects }) {
-    const [hasMounted, setHasMounted] = useState(false);
+    // Starts on DEFAULT_CATEGORY so the server render and the first client
+    // render agree. The cards are part of the static HTML: crawlers, link
+    // previews and visitors without JS see real case studies, not a skeleton.
     const [activeCategory, setActiveCategory] = useState(DEFAULT_CATEGORY);
 
-    // Parse URL on mount
+    // Apply ?category= after hydration, once the static markup is already up.
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const categoryParam = params.get("category");
         if (categoryParam && CATEGORIES[categoryParam]) {
             setActiveCategory(categoryParam);
         }
-        setHasMounted(true);
     }, []);
 
     // Update URL on category change (after mount)
@@ -38,32 +39,6 @@ export default function FeaturedProjects({ allProjects }) {
             ...inCategory.filter((project) => !project.is_featured),
         ].slice(0, FEATURED_LIMIT);
     }, [allProjects, activeCategory]);
-
-    // SSR placeholder to prevent hydration mismatch
-    if (!hasMounted) {
-        return (
-            <div className="space-y-8">
-                <div className="flex flex-wrap gap-3">
-                    {CATEGORY_ORDER.map((catId) => (
-                        <div
-                            key={catId}
-                            className="rounded-full border border-gray-200 px-5 py-2.5 text-sm font-medium text-gray-400"
-                        >
-                            {CATEGORIES[catId].label}
-                        </div>
-                    ))}
-                </div>
-                <div className="grid gap-6 md:grid-cols-2">
-                    {Array.from({ length: FEATURED_LIMIT }, (_, i) => i).map((i) => (
-                        <div
-                            key={i}
-                            className="h-72 animate-pulse rounded-3xl border border-gray-100 bg-gray-50"
-                        />
-                    ))}
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="space-y-8">
