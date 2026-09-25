@@ -1,0 +1,2060 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>One installer, three eras: Node.js async control flow</title>
+<meta name="description" content="Three shapes (sequential, parallel, limited) across three syntaxes (callbacks, promises, async/await), traced side by side. The shape decides the runtime; the syntax decides the readability.">
+<link rel="canonical" href="https://nabeelkhan.dev/lab/async-trace">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="One installer, three eras: Node.js async control flow">
+<meta property="og:description" content="Three shapes (sequential, parallel, limited) across three syntaxes (callbacks, promises, async/await), traced side by side. The shape decides the runtime; the syntax decides the readability.">
+<meta property="og:url" content="https://nabeelkhan.dev/lab/async-trace">
+<meta property="og:image" content="https://nabeelkhan.dev/lab/async-trace/og-async-trace.png">
+<meta property="og:site_name" content="Nabeel Ahmed Khan">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="One installer, three eras: Node.js async control flow">
+<meta name="twitter:description" content="Three shapes across three syntaxes, traced side by side. The shape decides the runtime; the syntax decides the readability.">
+<meta name="twitter:image" content="https://nabeelkhan.dev/lab/async-trace/og-async-trace.png">
+
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; padding: 0; }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+
+<style>
+/* ── tokens ─────────────────────────────────────────────────────────── */
+:root {
+  --ground:      #EFF1F5;
+  --surface:     #FFFFFF;
+  --surface-2:   #F6F8FB;
+  --ink:         #14171F;
+  --ink-2:       #3C4453;
+  --muted:       #6E7686;
+  --rule:        #D7DBE4;
+  --rule-2:      #B8BFCD;
+
+  --cpu:   #B4441A;   /* synchronous JS, on the stack */
+  --io:    #1C5F94;   /* waiting on I/O */
+  --join:  #6B3FA0;   /* a callback firing / the join point */
+  --ok:    #2C7A50;   /* finished */
+  --warn:  #9C6B08;   /* hazard */
+
+  --cpu-t:  #B4441A18;
+  --io-t:   #1C5F9414;
+  --join-t: #6B3FA016;
+  --ok-t:   #2C7A5014;
+  --warn-t: #9C6B0818;
+
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Charter, Georgia, serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground:    #12141A;
+    --surface:   #191C24;
+    --surface-2: #1E222B;
+    --ink:       #E7EAF1;
+    --ink-2:     #B6BDCB;
+    --muted:     #848D9E;
+    --rule:      #2B303B;
+    --rule-2:    #3E4553;
+
+    --cpu:   #EC8253;
+    --io:    #66ADE2;
+    --join:  #AF93E4;
+    --ok:    #5FBD87;
+    --warn:  #DDAE45;
+
+    --cpu-t:  #EC825322;
+    --io-t:   #66ADE21C;
+    --join-t: #AF93E41E;
+    --ok-t:   #5FBD871E;
+    --warn-t: #DDAE4520;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:    #12141A;
+  --surface:   #191C24;
+  --surface-2: #1E222B;
+  --ink:       #E7EAF1;
+  --ink-2:     #B6BDCB;
+  --muted:     #848D9E;
+  --rule:      #2B303B;
+  --rule-2:    #3E4553;
+  --cpu:   #EC8253;
+  --io:    #66ADE2;
+  --join:  #AF93E4;
+  --ok:    #5FBD87;
+  --warn:  #DDAE45;
+  --cpu-t:  #EC825322;
+  --io-t:   #66ADE21C;
+  --join-t: #AF93E41E;
+  --ok-t:   #5FBD871E;
+  --warn-t: #DDAE4520;
+}
+
+:root[data-theme="light"] {
+  --ground:    #EFF1F5;
+  --surface:   #FFFFFF;
+  --surface-2: #F6F8FB;
+  --ink:       #14171F;
+  --ink-2:     #3C4453;
+  --muted:     #6E7686;
+  --rule:      #D7DBE4;
+  --rule-2:    #B8BFCD;
+  --cpu:   #B4441A;
+  --io:    #1C5F94;
+  --join:  #6B3FA0;
+  --ok:    #2C7A50;
+  --warn:  #9C6B08;
+  --cpu-t:  #B4441A18;
+  --io-t:   #1C5F9414;
+  --join-t: #6B3FA016;
+  --ok-t:   #2C7A5014;
+  --warn-t: #9C6B0818;
+}
+
+/* ── base ───────────────────────────────────────────────────────────── */
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+figure, blockquote, h1, h2, h3, p, ul, ol { margin: 0; }
+button, input, output { font: inherit; color: inherit; }
+
+.wrap { max-width: 1080px; margin-inline: auto; padding: 0 24px 96px; }
+
+main { display: flex; flex-direction: column; gap: 76px; }
+section { display: flex; flex-direction: column; gap: 22px; scroll-margin-top: 28px; }
+
+p, ul, ol { max-width: 68ch; }
+p { color: var(--ink-2); }
+ul, ol { padding-left: 1.4em; display: flex; flex-direction: column; gap: 8px; color: var(--ink-2); }
+li::marker { color: var(--muted); }
+strong { color: var(--ink); font-weight: 650; }
+a { color: var(--io); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--io); outline-offset: 3px; border-radius: 2px;
+}
+
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; line-height: 1.15; }
+h1 { font-size: clamp(34px, 5.2vw, 50px); letter-spacing: -0.015em; }
+h2 { font-size: clamp(25px, 3.4vw, 33px); letter-spacing: -0.01em; }
+h3 { font-size: 20px; letter-spacing: -0.005em; }
+
+.eyebrow {
+  font-family: var(--font-mono); font-size: 11.5px; font-weight: 500;
+  letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted);
+  display: flex; align-items: center; gap: 12px;
+}
+.eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+.eyebrow .tag {
+  color: var(--io); border: 1px solid var(--rule-2); border-radius: 2px;
+  padding: 2px 7px; letter-spacing: 0.1em;
+}
+
+/* ── masthead ───────────────────────────────────────────────────────── */
+.masthead { padding: 56px 0 8px; display: flex; flex-direction: column; gap: 24px; }
+.masthead .kicker {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--muted);
+}
+.lede {
+  font-family: var(--font-display); font-size: clamp(19px, 2.3vw, 23px);
+  line-height: 1.5; color: var(--ink-2); max-width: 58ch;
+}
+.masthead .rule { height: 1px; background: var(--rule); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 22px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 14px; height: 9px; border-radius: 1px; display: inline-block; }
+
+.versions { display: flex; flex-wrap: wrap; gap: 8px; }
+.versions a {
+  display: inline-flex; align-items: baseline; gap: 9px; text-decoration: none;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.05em;
+  border: 1px solid var(--rule-2); border-radius: 2px; padding: 7px 11px;
+  color: var(--muted); background: var(--surface);
+}
+.versions a:hover { border-color: var(--io); color: var(--ink); }
+.versions a b { font-weight: 600; letter-spacing: 0.1em; }
+.versions a[data-v="hell"] b { color: var(--muted); }
+.versions a[data-v="seq"]  b { color: var(--cpu); }
+.versions a[data-v="par"]  b { color: var(--io); }
+.versions a[data-v="race"] b { color: var(--warn); }
+.versions a[data-v="lim"]  b { color: var(--ok); }
+
+/* ── prose furniture ────────────────────────────────────────────────── */
+.book {
+  font-family: var(--font-display); font-size: 19px; line-height: 1.55;
+  border-left: 2px solid var(--join); padding: 4px 0 4px 20px;
+  color: var(--ink); max-width: 60ch;
+}
+.book .src { display: block; font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-top: 10px; }
+
+.note {
+  background: var(--surface); border: 1px solid var(--rule); border-left: 3px solid var(--warn);
+  border-radius: 3px; padding: 16px 20px; max-width: 68ch;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.note h3 { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--warn); font-weight: 600; }
+.note p { font-size: 15.5px; margin: 0; }
+
+/* ── code ───────────────────────────────────────────────────────────── */
+.code {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 3px;
+  overflow-x: auto; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.7;
+  padding: 16px 18px; color: var(--ink);
+  white-space: pre; scrollbar-width: thin;
+}
+.code .path {
+  display: block; font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); border-bottom: 1px solid var(--rule);
+  margin: -16px -18px 14px; padding: 9px 18px; background: var(--surface-2);
+}
+.code em { color: var(--muted); font-style: italic; }
+.code b { font-weight: 400; }
+.code mark {
+  background: var(--io-t); color: var(--ink);
+  box-shadow: -4px 0 0 var(--io-t), 4px 0 0 var(--io-t);
+  border-radius: 1px;
+}
+.code mark.j { background: var(--join-t); box-shadow: -4px 0 0 var(--join-t), 4px 0 0 var(--join-t); }
+.code mark.c { background: var(--cpu-t); box-shadow: -4px 0 0 var(--cpu-t), 4px 0 0 var(--cpu-t); }
+.code mark.g { background: var(--ok-t); box-shadow: -4px 0 0 var(--ok-t), 4px 0 0 var(--ok-t); }
+.code mark.w { background: var(--warn-t); box-shadow: -4px 0 0 var(--warn-t), 4px 0 0 var(--warn-t); }
+.code s { text-decoration: line-through; text-decoration-color: var(--warn); color: var(--muted); }
+
+/* ── queue mechanism ────────────────────────────────────────────────── */
+.qdiag {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 20px; display: flex; align-items: center; gap: 16px;
+  overflow-x: auto; flex-wrap: nowrap; min-height: 0;
+}
+.qgroup { display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto; }
+.qgroup .lbl {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.13em;
+  text-transform: uppercase; color: var(--muted); white-space: nowrap;
+}
+.qslots { display: flex; gap: 6px; }
+.qbox {
+  border: 1px solid var(--rule-2); border-radius: 2px; padding: 7px 11px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+  background: var(--surface-2); white-space: nowrap;
+}
+.qbox.run { border-color: var(--ok); color: var(--ok); background: var(--ok-t); }
+.qbox.pend { border-style: dashed; }
+.qarrow { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; flex: 0 0 auto; }
+.qarrow b { display: block; color: var(--ink-2); font-weight: 400; }
+code { font-family: var(--font-mono); font-size: 0.88em; background: var(--surface-2); border: 1px solid var(--rule); border-radius: 2px; padding: 1px 5px; }
+p code, li code { color: var(--ink); }
+
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
+.grid-2 > figure { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+figcaption { font-family: var(--font-mono); font-size: 12px; color: var(--muted); letter-spacing: 0.04em; }
+
+/* ── pyramid figure ─────────────────────────────────────────────────── */
+.pyramid {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 18px 0; overflow-x: auto;
+}
+.pyr-row { display: grid; grid-template-columns: 128px 1fr; align-items: center; gap: 0; min-width: 560px; }
+.pyr-bar { height: 13px; position: relative; }
+.pyr-bar i {
+  position: absolute; right: 8px; top: 3px; height: 7px; border-radius: 1px;
+  background: var(--cpu); opacity: 0.9;
+}
+.pyr-code { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.45; color: var(--ink-2); white-space: pre; }
+.pyr-row.deep .pyr-code { color: var(--cpu); }
+.pyr-legend { padding: 12px 18px 0; font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
+
+/* ── step chain ─────────────────────────────────────────────────────── */
+.chain { display: flex; flex-direction: column; gap: 0; max-width: 620px; }
+.chain-step { display: grid; grid-template-columns: 26px 1fr; gap: 14px; }
+.chain-rail { position: relative; display: flex; justify-content: center; }
+.chain-rail::before { content: ""; position: absolute; top: 0; bottom: 0; width: 1px; background: var(--rule-2); }
+.chain-step:first-child .chain-rail::before { top: 13px; }
+.chain-step:last-child .chain-rail::before { bottom: calc(100% - 13px); }
+.chain-dot {
+  position: relative; margin-top: 7px; width: 11px; height: 11px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--rule-2);
+}
+.chain-step[data-kind="join"] .chain-dot { border-color: var(--join); background: var(--join); }
+.chain-body { padding-bottom: 20px; display: flex; flex-direction: column; gap: 3px; }
+.chain-body .t { font-family: var(--font-mono); font-size: 13.5px; color: var(--ink); }
+.chain-body .d { font-size: 14px; color: var(--muted); line-height: 1.5; }
+
+/* ── trace / logic-analyzer ─────────────────────────────────────────── */
+.trace {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 4px;
+  display: flex; flex-direction: column;
+}
+.trace-head {
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid var(--rule); background: var(--surface-2);
+}
+.trace-head .ttl { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--muted); }
+.trace-ctl { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.trace-ctl label { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+.trace-ctl input[type="range"] { width: 120px; accent-color: var(--io); }
+.trace-ctl output { font-family: var(--font-mono); font-size: 13px; color: var(--ink); min-width: 1.5ch; }
+.run {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+  background: var(--io); color: var(--surface); border: none; border-radius: 2px;
+  padding: 8px 18px; cursor: pointer; font-weight: 600;
+}
+.run:hover { filter: brightness(1.12); }
+.run[disabled] { opacity: 0.45; cursor: default; filter: none; }
+
+.lanes { display: flex; flex-direction: column; }
+.lane { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+.lane + .lane { border-top: 1px solid var(--rule); }
+.lane-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.lane-name { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
+.lane[data-lane="seq"] .lane-name { color: var(--cpu); }
+.lane[data-lane="par"] .lane-name { color: var(--io); }
+.lane[data-lane="lim"] .lane-name { color: var(--ok); }
+.lane-sub { font-size: 13.5px; color: var(--muted); }
+.lane-clock {
+  margin-left: auto; font-family: var(--font-mono); font-size: 14px;
+  font-variant-numeric: tabular-nums; color: var(--ink); letter-spacing: 0.02em;
+}
+.lane-clock b { font-weight: 600; }
+
+.rows { display: flex; flex-direction: column; gap: 5px; }
+.row { display: grid; grid-template-columns: 118px 1fr; align-items: center; gap: 12px; }
+.row-label { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track { position: relative; height: 17px; background: linear-gradient(to right, var(--rule) 1px, transparent 1px) repeat-x; background-size: 12.5% 100%; border-bottom: 1px solid var(--rule); }
+.bar { position: absolute; top: 2px; height: 13px; border: 1px dashed var(--rule-2); border-radius: 1px; box-sizing: border-box; }
+.bar i { position: absolute; inset: -1px auto -1px -1px; border-radius: 1px; display: block; }
+.bar[data-c="par"] i { background: var(--io); }
+.bar[data-c="seq"] i { background: var(--cpu); }
+.bar[data-c="lim"] i { background: var(--ok); }
+.wait {
+  position: absolute; top: 4px; height: 9px; box-sizing: border-box;
+  background: repeating-linear-gradient(45deg, var(--rule-2) 0 1px, transparent 1px 5px);
+  border-radius: 1px;
+}
+.wait::after {
+  content: ""; position: absolute; right: 0; top: -2px; bottom: -2px;
+  width: 1px; background: var(--rule-2);
+}
+.flag { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--join); }
+.flag::after {
+  content: attr(data-t); position: absolute; left: 6px; top: -1px;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--join); white-space: nowrap;
+}
+.playhead { position: absolute; top: -2px; bottom: -2px; width: 1px; background: var(--ink); opacity: 0.55; }
+
+.axis { display: grid; grid-template-columns: 118px 1fr; gap: 12px; padding: 0 20px 16px; }
+.axis-ticks { position: relative; height: 20px; }
+.axis-ticks span {
+  position: absolute; top: 0; font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--muted); transform: translateX(-50%); font-variant-numeric: tabular-nums;
+}
+.axis-ticks span::before { content: ""; position: absolute; left: 50%; top: -4px; height: 4px; width: 1px; background: var(--rule-2); }
+
+.verdict {
+  border-top: 1px solid var(--rule); padding: 14px 20px; background: var(--surface-2);
+  font-family: var(--font-mono); font-size: 13px; color: var(--ink-2);
+  display: flex; flex-wrap: wrap; gap: 8px 24px;
+}
+.verdict b { color: var(--ink); font-weight: 600; }
+
+/* ── tree ───────────────────────────────────────────────────────────── */
+.tree {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 18px 20px; font-family: var(--font-mono); font-size: 13px; line-height: 2;
+  overflow-x: auto; white-space: pre; color: var(--ink-2);
+}
+.ord {
+  display: inline-block; min-width: 20px; text-align: center; font-size: 11px;
+  border: 1px solid currentColor; border-radius: 2px; padding: 0 4px; margin-right: 10px;
+  font-variant-numeric: tabular-nums; line-height: 1.5;
+}
+.ord.s { color: var(--cpu); }
+.ord.p { color: var(--io); }
+.tree .wave { color: var(--io); }
+.tree .bad { color: var(--warn); }
+.tree b { color: var(--ink); font-weight: 600; }
+.tree em { color: var(--muted); font-style: italic; }
+
+/* ── compare table ──────────────────────────────────────────────────── */
+.cmp-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14.5px; }
+th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+thead th {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); font-weight: 500; background: var(--surface-2); white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody th { font-weight: 500; color: var(--ink); font-size: 14px; width: 26%; }
+td { color: var(--ink-2); }
+td code { font-size: 12.5px; }
+
+/* ── the 3×3 matrix ─────────────────────────────────────────────────── */
+.matrix { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px; background: var(--surface); }
+.matrix table { min-width: 800px; }
+.matrix thead th { padding: 11px 15px; border-bottom: 1px solid var(--rule-2); }
+.matrix thead th[data-s] { font-size: 11.5px; letter-spacing: 0.11em; }
+.matrix thead th[data-s="seq"] { color: var(--cpu); }
+.matrix thead th[data-s="par"] { color: var(--io); }
+.matrix thead th[data-s="lim"] { color: var(--ok); }
+.matrix tbody th {
+  width: 14%; padding: 0 15px; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink);
+  background: var(--surface-2); white-space: nowrap; vertical-align: middle;
+}
+.matrix td { padding: 0; border-left: 1px solid var(--rule); }
+.mcell { display: flex; flex-direction: column; gap: 5px; padding: 13px 15px; text-decoration: none; }
+a.mcell:hover { background: var(--surface-2); }
+a.mcell:hover .idiom { color: var(--io); }
+.mcell .idiom { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink); line-height: 1.5; }
+.mcell .dir { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); letter-spacing: 0.03em; }
+
+/* ── era divider ────────────────────────────────────────────────────── */
+.era { gap: 18px; padding-top: 30px; border-top: 2px solid var(--ink); }
+.era .num {
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.17em;
+  text-transform: uppercase; color: var(--muted);
+}
+.era h2 { font-size: clamp(28px, 4.2vw, 42px); }
+
+/* ── closing cards ──────────────────────────────────────────────────── */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.card {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 18px 20px; display: flex; flex-direction: column; gap: 8px;
+}
+.card h3 { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); font-weight: 600; }
+.card p { font-size: 14.5px; margin: 0; }
+.card .dir { font-family: var(--font-mono); font-size: 11.5px; color: var(--io); }
+
+footer b { color: var(--ink-2); font-weight: 600; }
+footer { border-top: 1px solid var(--rule); padding-top: 24px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); line-height: 1.9; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+@media (max-width: 640px) {
+  .row, .axis { grid-template-columns: 84px 1fr; }
+  .row-label { font-size: 10.5px; }
+}
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <div class="kicker">Async control flow in Node · taxonomy from Node.js Design Patterns ch. 4–5 · examples my own</div>
+  <h1>One installer, three eras</h1>
+  <p class="lede">I rewrote the same dependency installer eleven times. The work never changes: read a manifest, fetch the package, follow its dependencies. Only two things vary: the <em>shape</em> the work takes on the timeline, and the syntax you spell that shape in. Three shapes × three syntaxes is the whole problem.</p>
+
+  <figure class="matrix">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th data-s="seq">Sequential: one at a time</th>
+          <th data-s="par">Parallel: all at once</th>
+          <th data-s="lim">Limited: at most <em>n</em></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>Callbacks</th>
+          <td><a class="mcell" href="#v2"><span class="idiom">iterate(index) recursion</span><span class="dir">callbacks/03-sequential</span></a></td>
+          <td><a class="mcell" href="#v3"><span class="idiom">for…of + completed counter</span><span class="dir">callbacks/04-parallel</span></a></td>
+          <td><a class="mcell" href="#v4"><span class="idiom">TaskQueue + done callback</span><span class="dir">callbacks/06-queued</span></a></td>
+        </tr>
+        <tr>
+          <th>Promises</th>
+          <td><a class="mcell" href="#p2"><span class="idiom">p = p.then(() =&gt; next())</span><span class="dir">promises/01-sequential</span></a></td>
+          <td><a class="mcell" href="#p3"><span class="idiom">Promise.all(deps.map(…))</span><span class="dir">promises/02-parallel</span></a></td>
+          <td><a class="mcell" href="#p4"><span class="idiom">TaskQueue + .finally()</span><span class="dir">promises/03-queued</span></a></td>
+        </tr>
+        <tr>
+          <th>Async / await</th>
+          <td><a class="mcell" href="#a2"><span class="idiom">for (…) { await … }</span><span class="dir">async-await/01-sequential</span></a></td>
+          <td><a class="mcell" href="#a3"><span class="idiom">Promise.all(deps.map(…))</span><span class="dir">async-await/02-parallel</span></a></td>
+          <td><a class="mcell" href="#a4"><span class="idiom">TaskQueue + once(q,'empty')</span><span class="dir">async-await/03-queued</span></a></td>
+        </tr>
+      </tbody>
+    </table>
+  </figure>
+
+  <nav class="versions" aria-label="jump to a version">
+    <a href="#v1" data-v="hell"><b>v1</b> callbacks/01-nested · callback hell</a>
+    <a href="#v3r" data-v="race"><b>v3·1</b> callbacks/05-deduped · the race fix</a>
+    <a href="#ch5" data-v="par"><b>promises</b> what promises delete</a>
+    <a href="#traps" data-v="race"><b>traps</b> return await · recursion leaks</a>
+  </nav>
+
+  <div class="rule"></div>
+  <div class="legend">
+    <span><i style="background: var(--cpu)"></i> sequential: one at a time</span>
+    <span><i style="background: var(--io)"></i> parallel: all at once</span>
+    <span><i style="background: var(--ok)"></i> queued: at most N at once</span>
+    <span><i style="background: var(--join)"></i> the moment "everything is done" fires</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ══ HERO TRACE ══════════════════════════════════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="tag">the question</span></div>
+  <h2>Same fetches. Three totals.</h2>
+  <p>Press <strong>Run</strong>. All three lanes install the root package, then fetch every dependency it declares, identical work, identical registry speeds. The only difference is <em>when</em> each fetch is allowed to start. Add dependencies with the first slider and watch one lane grow while another doesn't; change the concurrency limit and watch the third lane slide between the two.</p>
+
+  <figure class="trace" id="trace">
+    <div class="trace-head">
+      <div class="ttl">install trace · time →</div>
+      <div class="trace-ctl">
+        <label for="linkCount">deps <output id="linkOut">4</output></label>
+        <input type="range" id="linkCount" min="2" max="8" value="4" step="1" aria-label="number of dependencies on the root package">
+        <label for="conc">concurrency <output id="concOut">2</output></label>
+        <input type="range" id="conc" min="1" max="8" value="2" step="1" aria-label="queue concurrency limit">
+        <button class="run" id="runBtn">Run</button>
+      </div>
+    </div>
+
+    <div class="lanes">
+      <section class="lane" data-lane="seq">
+        <div class="lane-head">
+          <span class="lane-name">Sequential</span>
+          <span class="lane-sub">v2 · <code>iterate(index)</code></span>
+          <span class="lane-clock" id="clockSeq"><b>0</b> ms</span>
+        </div>
+        <div class="rows" id="rowsSeq"></div>
+      </section>
+
+      <section class="lane" data-lane="par">
+        <div class="lane-head">
+          <span class="lane-name">Parallel</span>
+          <span class="lane-sub">v3 · <code>for…of</code> + counter</span>
+          <span class="lane-clock" id="clockPar"><b>0</b> ms</span>
+        </div>
+        <div class="rows" id="rowsPar"></div>
+      </section>
+
+      <section class="lane" data-lane="lim">
+        <div class="lane-head">
+          <span class="lane-name">Queued</span>
+          <span class="lane-sub">v4 · <code>TaskQueue(<span id="cLabel">2</span>)</code>: hatched = waiting in the queue</span>
+          <span class="lane-clock" id="clockLim"><b>0</b> ms</span>
+        </div>
+        <div class="rows" id="rowsLim"></div>
+      </section>
+    </div>
+
+    <div class="axis">
+      <div></div>
+      <div class="axis-ticks" id="axisTicks"></div>
+    </div>
+
+    <figcaption class="verdict" id="verdict"></figcaption>
+  </figure>
+
+  <p><strong>The law behind the picture:</strong> sequential total is the <em>sum</em> of the durations; parallel total is the <em>max</em>; queued lands in between, and never puts more than <code>concurrency</code> requests in flight. Push the concurrency slider to 1 and the third lane becomes the first; push it past the dependency count and it becomes the second.</p>
+
+  <p>Keep this trace in mind for the rest of the page. <strong>Nothing below changes it.</strong> Promises and <code>async/await</code> rewrite how you <em>spell</em> these three lanes: they don't add a fourth one, and they don't make any lane faster.</p>
+</section>
+
+<!-- ══ THE PRIMITIVE ═══════════════════════════════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="tag">the primitive</span> everything is built from one shape</div>
+  <h2>A callback is a "what to do next", handed forward</h2>
+  <p>Before any of the patterns make sense, one idea has to be solid. A synchronous function <em>returns</em> its result. An asynchronous function can't: the result doesn't exist yet. So instead of returning, it takes the rest of your program as an argument and calls it later. That argument is the continuation.</p>
+
+  <div class="grid-2">
+    <figure>
+      <div class="code"><span class="path">synchronous: the stack remembers</span>const data = readFileSync(f)
+process(data)
+<em>// line 2 cannot run until line 1 finishes.</em>
+<em>// The stack frame holds "what's next".</em></div>
+      <figcaption>Order is free. The call stack enforces it.</figcaption>
+    </figure>
+    <figure>
+      <div class="code"><span class="path">asynchronous: you must supply "next"</span>readFile(f, (err, data) =&gt; {
+  process(data)
+})
+<em>// readFile returns immediately.</em>
+<em>// The stack is already empty when</em>
+<em>// process(data) eventually runs.</em></div>
+      <figcaption>Order costs you something. You have to encode it.</figcaption>
+    </figure>
+  </div>
+
+  <p class="book">Everything so far, the pyramid, the recursion, the counter, is a workaround for one fact: <strong>the call stack unwinds before your result arrives.</strong> Any ordering you want after that point, you have to reconstruct by hand.
+  <span class="src">the whole of era one in one sentence</span></p>
+</section>
+
+<!-- ══ v1 CALLBACK HELL ════════════════════════════════════════════ -->
+<section id="v1">
+  <div class="eyebrow"><span class="tag">v1</span> callbacks/01-nested · callback hell</div>
+  <h2>Version 1 installs exactly one package, and it's already unreadable</h2>
+  <p>No dependency walking here yet, no loop, no concurrency. Just four operations that must happen in order: check the store, fetch the package, make the directory, write the tarball. Four steps. And because each one is asynchronous, each one nests inside the previous one's callback.</p>
+
+  <div class="chain">
+    <div class="chain-step" data-kind="io">
+      <div class="chain-rail"><span class="chain-dot"></span></div>
+      <div class="chain-body"><span class="t">inStore(storePath, …)</span><span class="d">Already in the store? Then we're done: call back and stop.</span></div>
+    </div>
+    <div class="chain-step" data-kind="io">
+      <div class="chain-rail"><span class="chain-dot"></span></div>
+      <div class="chain-body"><span class="t">get(spec, …)</span><span class="d">Fetch it from the registry. Slow, and off the stack.</span></div>
+    </div>
+    <div class="chain-step" data-kind="io">
+      <div class="chain-rail"><span class="chain-dot"></span></div>
+      <div class="chain-body"><span class="t">mkdirp(dirname(storePath), …)</span><span class="d">Create the folder tree before writing into it.</span></div>
+    </div>
+    <div class="chain-step" data-kind="io">
+      <div class="chain-rail"><span class="chain-dot"></span></div>
+      <div class="chain-body"><span class="t">writeFile(storePath, content, …)</span><span class="d">Save the tarball.</span></div>
+    </div>
+    <div class="chain-step" data-kind="join">
+      <div class="chain-rail"><span class="chain-dot"></span></div>
+      <div class="chain-body"><span class="t">cb(null, storePath, true)</span><span class="d">Only now does the caller learn anything happened.</span></div>
+    </div>
+  </div>
+
+  <p>Written with an <code>if/else</code> for every error, those four steps produce this. The bars on the left are indentation depth. The shape is the whole point:</p>
+
+  <div class="pyramid" id="pyramid">
+    <div class="pyr-legend">callbacks/01-nested/install.js: indentation depth →</div>
+  </div>
+
+  <p><strong>Why it's called "hell":</strong> the error handling for step 1 (<code>if (err)</code>) and the success path for step 1 (<code>else</code>) end up separated by <em>every other step in the program</em>. To find out what happens when <code>inStore()</code> fails, your eye travels 25 lines. The closing <code>}) }) }) })</code> tail carries no information at all, yet you have to count it to know where you are.</p>
+
+  <div class="note">
+    <h3>Not a performance problem</h3>
+    <p>The pyramid runs perfectly well. Callback hell is a <em>readability</em> failure, and readability failures become correctness failures: a forgotten <code>return</code> before <code>cb(err)</code> means the callback fires twice, and at depth 8 nobody notices.</p>
+  </div>
+
+  <h3>The fix isn't a library: it's discipline</h3>
+  <p>Version <code>callbacks/02-flattened</code> changes no behaviour whatsoever. It applies three rules and the pyramid collapses:</p>
+  <ol>
+    <li><strong>Return early.</strong> <code>return cb(err)</code> instead of <code>if/else</code>: the error path exits, so the happy path never gets indented.</li>
+    <li><strong>Name your continuations.</strong> The <code>mkdir → writeFile</code> pair becomes a top-level <code>writeToStore()</code>; <code>get → writeToStore</code> becomes <code>fetchPackage()</code>.</li>
+    <li><strong>Reuse them.</strong> Those named functions are now callable from anywhere, which is exactly what v2 and v3 will need.</li>
+  </ol>
+
+  <div class="code"><span class="path">callbacks/02-flattened/install.js: same work, depth 3 instead of 9</span>function writeToStore(storePath, content, cb) {
+  mkdirp(dirname(storePath), err =&gt; {
+    <mark>if (err) { return cb(err) }</mark>
+    writeFile(storePath, content, cb)
+  })
+}
+
+function fetchPackage(spec, storePath, cb) {
+  get(spec, (err, content) =&gt; {
+    <mark>if (err) { return cb(err) }</mark>
+    writeToStore(storePath, content, err =&gt; {
+      <mark>if (err) { return cb(err) }</mark>
+      cb(null, content)
+    })
+  })
+}</div>
+
+  <p>Note <code>writeFile(storePath, content, cb)</code> on the last line of <code>writeToStore</code>: the callback is passed straight through rather than wrapped in another arrow. Every avoided wrapper is an avoided level.</p>
+</section>
+
+<!-- ══ THE NEW REQUIREMENT ═════════════════════════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="tag">the turn</span> from one package to a whole tree</div>
+  <h2>Now do it for every dependency, recursively</h2>
+  <p>v2 and v3 add one requirement: after writing a package to the store, read its manifest and install each of its dependencies too, down to <code>maxDepth</code>. Both versions share <em>identical</em> code for this, the same <code>fetchPackage</code>, the same <code>install</code>, the same guard clauses:</p>
+
+  <div class="code"><span class="path">shared by callbacks/03-sequential and callbacks/04-parallel</span>export function install(spec, maxDepth, cb) {
+  const storePath = storePathFor(spec)
+
+  inStore(storePath, (err, alreadyInstalled) =&gt; {
+    if (err) { return cb(err) }
+
+    if (alreadyInstalled) {
+      <em>// in the store already: read its manifest and follow its deps</em>
+      return readManifest(storePath, (err, manifest) =&gt; {
+        if (err) { return cb(err) }
+        <mark>return installDeps(manifest, maxDepth, cb)</mark>
+      })
+    }
+
+    fetchPackage(spec, storePath, (err, manifest) =&gt; {
+      if (err) { return cb(err) }
+      if (manifest.dependencies) {
+        <mark>return installDeps(manifest, maxDepth, cb)</mark>
+      }
+      return cb()   <em>// a leaf package: nothing to follow</em>
+    })
+  })
+}</div>
+
+  <p><strong>The entire difference between the two versions lives inside <code>installDeps</code>.</strong> Twelve lines, in one file, in one function. Everything else is byte-for-byte the same.</p>
+
+  <div class="note">
+    <h3>Why <code>process.nextTick(cb)</code> guards the early exits</h3>
+    <p>When <code>maxDepth === 0</code> or a package has no dependencies, <code>installDeps</code> has nothing async to wait for, so calling <code>cb()</code> directly would fire it <em>synchronously</em>, before the caller had finished setting itself up. That's Zalgo: a function that is sometimes sync and sometimes async. <code>process.nextTick</code> defers the call to the next iteration of the event loop, so the API is <em>always</em> asynchronous.</p>
+  </div>
+</section>
+
+<!-- ══ SEQUENTIAL ══════════════════════════════════════════════════ -->
+<section id="v2">
+  <div class="eyebrow"><span class="tag">v2</span> callbacks/03-sequential · one at a time</div>
+  <h2>Sequential: recursion, because a <code>for</code> loop can't wait</h2>
+  <p>The instinct is to write <code>for (const dep of deps) install(dep, …)</code> and expect each iteration to wait. It won't: <code>install()</code> returns immediately, so the loop would fire all of them at once. A loop counter lives on the stack, and the stack is gone by the time the callbacks run.</p>
+  <p>So the counter has to live somewhere that survives: <strong>an argument to a function that calls itself from inside the callback.</strong></p>
+
+  <div class="code"><span class="path">callbacks/03-sequential/install.js: the whole difference</span>function installDeps(manifest, maxDepth, cb) {
+  if (maxDepth === 0) { return process.nextTick(cb) }
+  const deps = getDependencies(manifest)
+  if (deps.length === 0) { return process.nextTick(cb) }
+
+  <mark class="c">function iterate(index) {</mark>
+    <mark class="j">if (index === deps.length) { return cb() }</mark>   <em>// ← base case: all done</em>
+
+    install(deps[index], maxDepth - 1, err =&gt; {
+      if (err) { return cb(err) }
+      <mark class="c">iterate(index + 1)</mark>                  <em>// ← the "loop", one frame deeper</em>
+    })
+  }
+
+  <mark class="c">iterate(0)</mark>
+}</div>
+
+  <h3>Read it as a cycle, not a stack</h3>
+  <div class="chain">
+    <div class="chain-step" data-kind="cpu">
+      <div class="chain-rail"><span class="chain-dot"></span></div>
+      <div class="chain-body"><span class="t">iterate(0)</span><span class="d">Is 0 the end? No. Launch <code>install(deps[0])</code> and <strong>return immediately</strong>. The stack empties. Node is idle, waiting on the network.</span></div>
+    </div>
+    <div class="chain-step" data-kind="io">
+      <div class="chain-rail"><span class="chain-dot"></span></div>
+      <div class="chain-body"><span class="t">…dep 0 finishes…</span><span class="d">Its callback fires. Inside it: <code>iterate(1)</code>. Only now does dep 1 start.</span></div>
+    </div>
+    <div class="chain-step" data-kind="io">
+      <div class="chain-rail"><span class="chain-dot"></span></div>
+      <div class="chain-body"><span class="t">…dep 1 finishes…</span><span class="d"><code>iterate(2)</code>. And so on. At any moment exactly <strong>one</strong> request is in flight.</span></div>
+    </div>
+    <div class="chain-step" data-kind="join">
+      <div class="chain-rail"><span class="chain-dot"></span></div>
+      <div class="chain-body"><span class="t">iterate(deps.length) → cb()</span><span class="d">The index hits the end. The single base case fires the caller's callback. Exactly once.</span></div>
+    </div>
+  </div>
+
+  <p><strong>Where does "done" come from?</strong> From the index reaching <code>deps.length</code>. There is one exit, it's a plain equality check, and it cannot fire early. That simplicity is what you're buying by giving up the speed.</p>
+
+  <h3>The traversal order is depth-first</h3>
+  <p>Because <code>install()</code> for dep 0 fully completes, <em>including its own recursive <code>installDeps</code></em>, before dep 1 starts, the install walks the tree exactly the way <code>npm ls</code> prints it, top to bottom:</p>
+
+  <div class="tree"><span class="ord s">1</span>react
+<span class="ord s">2</span>├── loose-envify
+<span class="ord s">3</span>│   ├── js-tokens
+<span class="ord s">4</span>│   └── object-assign
+<span class="ord s">5</span>├── scheduler
+<span class="ord s">6</span>│   └── picocolors
+<span class="ord s">7</span>└── prop-types</div>
+
+  <p>One package at a time, one order, fully deterministic. Run it twice and the console output is identical, which is exactly the property a lockfile wants.</p>
+
+  <div class="note">
+    <h3>Doesn't the recursion blow the stack?</h3>
+    <p>No, and this is the part that trips people up. <code>iterate(index + 1)</code> is called from <em>inside a callback</em>, which the event loop invokes on a fresh, empty stack. The previous <code>iterate</code> frame is long gone. It looks like recursion in the source but behaves like a loop at runtime. (Contrast with a directly recursive sync function, which really would grow the stack.)</p>
+  </div>
+</section>
+
+<!-- ══ PARALLEL ════════════════════════════════════════════════════ -->
+<section id="v3">
+  <div class="eyebrow"><span class="tag">v3</span> callbacks/04-parallel · unlimited parallel execution</div>
+  <h2>Parallel: launch them all, then count the finishes</h2>
+  <p>If you don't need the ordering, the <code>for</code> loop that failed before becomes exactly right. Fire every <code>install()</code> in one synchronous pass; every request goes out before Node returns to the event loop. Now the problem inverts: not <em>"when do I start the next one?"</em> but <strong>"how do I know they've all finished?"</strong></p>
+
+  <div class="code"><span class="path">callbacks/04-parallel/install.js: same 12 lines, rewritten</span>function installDeps(manifest, maxDepth, cb) {
+  if (maxDepth === 0) { return process.nextTick(cb) }
+  const deps = getDependencies(manifest)
+  if (deps.length === 0) { return process.nextTick(cb) }
+
+  <mark class="j">let completed = 0</mark>
+  <mark class="j">let hasErrors = false</mark>
+
+  function done(err) {
+    if (err) {
+      hasErrors = true
+      return cb(err)
+    }
+    <mark class="j">if (++completed === deps.length &amp;&amp; !hasErrors) { return cb() }</mark>
+  }
+
+  <mark>for (const dep of deps) {</mark>
+    <mark>install(dep, maxDepth - 1, done)</mark>     <em>// same callback for every one</em>
+  <mark>}</mark>
+}</div>
+
+  <p>Three things carry the whole pattern:</p>
+  <ul>
+    <li><strong>One shared callback.</strong> Every <code>install()</code> gets the same <code>done</code> function, closing over the same <code>completed</code> variable. That closure is the only thing holding the group together.</li>
+    <li><strong><code>++completed === deps.length</code> is the join.</strong> Whichever task finishes last is the one that trips the condition and calls <code>cb()</code>. You don't know which task that will be, and it doesn't matter.</li>
+    <li><strong><code>hasErrors</code> is a latch, not a counter.</strong> On failure <code>cb(err)</code> fires immediately, but the other requests are still in flight and will still call <code>done</code>. The flag stops those late arrivals from firing <code>cb()</code> a second time.</li>
+  </ul>
+
+  <p>Compare the two exits. Sequential has one base case that can only be reached one way. Parallel has a counter that <em>N</em> different callbacks race to increment, plus a flag guarding against double-calling. The extra bookkeeping <em>is</em> the price of the speed.</p>
+
+  <h3>The traversal order is now a wavefront</h3>
+  <p>Every sibling starts together and each subtree races independently, so completion order is whatever the registry decides:</p>
+
+  <div class="tree"><span class="ord p">1</span>react
+<span class="ord p">2</span>├── loose-envify      <span class="wave">← all three start</span>
+<span class="ord p">3</span>│   ├── js-tokens     <span class="wave">← these start the moment loose-envify lands</span>
+<span class="ord p">3</span>│   └── object-assign
+<span class="ord p">2</span>├── scheduler         <span class="wave">← in the same tick as loose-envify</span>
+<span class="ord p">3</span>│   └── picocolors
+<span class="ord p">2</span>└── prop-types        <span class="wave">← in the same tick as loose-envify</span></div>
+
+  <p>The badges are depth, not order, because <strong>there is no order</strong>. Run it twice and the log lines come out shuffled.</p>
+</section>
+
+<!-- ══ SIDE BY SIDE ════════════════════════════════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="tag">the diff</span> everything that actually changed</div>
+  <h2>Twelve lines, five differences</h2>
+
+  <div class="cmp-scroll">
+    <table>
+      <thead>
+        <tr><th></th><th>Sequential · v2</th><th>Parallel · v3</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>Driving construct</th>
+          <td>Recursive <code>iterate(index)</code></td>
+          <td>Plain <code>for…of</code> loop</td>
+        </tr>
+        <tr>
+          <th>Where the next task starts</th>
+          <td>Inside the previous callback</td>
+          <td>All of them, in one synchronous pass</td>
+        </tr>
+        <tr>
+          <th>How "all done" is detected</th>
+          <td><code>index === deps.length</code>: a base case</td>
+          <td><code>++completed === deps.length</code>: a counter</td>
+        </tr>
+        <tr>
+          <th>Order of results</th>
+          <td>Deterministic, depth-first</td>
+          <td>Nondeterministic: a wavefront</td>
+        </tr>
+        <tr>
+          <th>Double-callback risk</th>
+          <td>None: one exit path</td>
+          <td>Real: needs the <code>hasErrors</code> latch</td>
+        </tr>
+        <tr>
+          <th>Total time</th>
+          <td><b>sum</b> of durations</td>
+          <td><b>max</b> of durations</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="book">Concurrent isn't parallel. Node runs one thread: every callback still takes its turn on the same event loop. What overlaps is the <em>waiting</em>: the network and the disk do their work outside JavaScript, so N requests can be outstanding while zero JavaScript is running.
+  <span class="src">why a single-threaded runtime gets faster here</span></p>
+</section>
+
+<!-- ══ v3.1 THE RACE ═══════════════════════════════════════════════ -->
+<section id="v3r">
+  <div class="eyebrow"><span class="tag">v3·1</span> callbacks/05-deduped · the race condition</div>
+  <h2>Going parallel invented a bug that couldn't exist before</h2>
+  <p>Dependency graphs are graphs, not trees: that is the whole reason lockfiles exist. Both <code>react</code> and <code>react-dom</code> depend on <code>loose-envify</code>. In v2 that was harmless: the first <code>install('loose-envify')</code> ran to completion, so by the time the second one called <code>inStore()</code> the package was already there and it returned early.</p>
+  <p>In v3 they both start in the same tick. Watch the interleaving:</p>
+
+  <div class="tree">t=0   <b>A</b> install('loose-envify')  →  inStore(…)  <span class="wave">… async, off the stack</span>
+t=0   <b>B</b> install('loose-envify')  →  inStore(…)  <span class="wave">… async, off the stack</span>
+      <em>nothing has been written yet: the package genuinely is not in the store</em>
+t=1   <b>A</b> ← false   →  fetchPackage()   <span class="bad">✗ fetches</span>
+t=1   <b>B</b> ← false   →  fetchPackage()   <span class="bad">✗ fetches again</span></div>
+
+  <p>Two registry requests, two writes to the same store path, and that package's own dependencies get installed twice, which then doubles again one level down. With a circular dependency this doesn't just waste bandwidth, it <strong>never terminates</strong>: <code>a</code> depends on <code>b</code> depends on <code>a</code>, and each visit looks new because the check always loses the race.</p>
+
+  <div class="note">
+    <h3>The general shape: check-then-act across an await point</h3>
+    <p><code>inStore()</code> and <code>writeFile()</code> are two separate asynchronous operations, so between them the event loop is free to run anybody else's code. Any "look before you leap" that spans an async boundary is a race waiting to happen. It isn't specific to files: the same shape bites you with database upserts, cache fills, and lock acquisition.</p>
+  </div>
+
+  <h3>The fix is a synchronous claim</h3>
+  <p>You can't make the check-and-write atomic, so instead you record the <em>intent</em> the moment it's formed, in memory, synchronously, before yielding to the event loop:</p>
+
+  <div class="code"><span class="path">callbacks/05-deduped/install.js: the only change from v3</span><mark class="g">const installing = new Set()</mark>
+
+export function install(spec, maxDepth, cb) {
+  <mark class="g">if (installing.has(spec)) {</mark>
+    <mark class="g">return process.nextTick(cb)</mark>   <em>// someone else already claimed it</em>
+  <mark class="g">}</mark>
+  <mark class="g">installing.add(spec)</mark>
+
+  const storePath = storePathFor(spec)
+  inStore(storePath, (err, alreadyInstalled) =&gt; {
+    <em>// …byte-for-byte identical to v3 from here down</em></div>
+
+  <p>The <code>has</code> / <code>add</code> pair runs in one uninterrupted synchronous block: no callback, no <code>await</code>, no chance for another task to slip between them. That's the whole trick: <strong>the guard must not be asynchronous.</strong></p>
+
+  <ul>
+    <li><strong>The <code>Set</code> is not a cache.</strong> It tracks "someone has started on this package", not "this package is finished". A duplicate caller returns immediately without waiting for the first one, which is fine for an installer that only cares the package lands in the store eventually.</li>
+    <li><strong><code>process.nextTick(cb)</code>, again.</strong> Same Zalgo defence as before: the early exit is on a synchronous code path, so the callback has to be deferred to stay asynchronous, or the parent's <code>completed</code> counter could be incremented before the loop that's counting it has finished.</li>
+    <li><strong>It's process-local.</strong> Two Node processes installing into the same store would still race. Real deduplication across processes needs a lock or an atomic filesystem operation.</li>
+  </ul>
+</section>
+
+<!-- ══ THE OTHER BILL ══════════════════════════════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="tag">the bill</span> the second thing parallel broke</div>
+  <h2>Unbounded concurrency is a denial-of-service you wrote yourself</h2>
+  <p>The race is fixed, but v3 still has no ceiling, and "launch them all" recurses. A package with 100 dependencies, whose dependencies have 100 each, puts <strong>10,000 registry requests in flight</strong> before the first one comes back:</p>
+
+  <div class="tree">depth 0    <span class="ord p">1</span> request
+depth 1    <span class="ord p">100</span> requests   <span class="wave">← all fired in one tick</span>
+depth 2    <span class="ord p">10,000</span> requests <span class="wave">← fired as each depth-1 manifest lands</span></div>
+
+  <p>What actually happens: <code>EMFILE</code> from exhausting file descriptors, <code>ECONNRESET</code> as the registry rate-limits you, memory ballooning with buffered tarballs, or you get your CI runner's IP throttled for everyone. The sequential version could never do this. It was capped at 1 by construction, and that cap was the one good thing about it.</p>
+
+  <p>So the missing piece is a <strong>ceiling you choose</strong>, not 1, not ∞, but <em>n</em>. The chapter builds it in three steps before applying it to the install:</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="dir">callbacks/limited-inline.js</div>
+      <h3>The pattern, inline</h3>
+      <p>The parallel counter plus two more variables: <code>running</code> and <code>nextTaskIndex</code>. A <code>next()</code> function starts tasks while <code>running &lt; concurrency</code>, and each completion calls <code>next()</code> again.</p>
+    </div>
+    <div class="card">
+      <div class="dir">callbacks/task-queue.js</div>
+      <h3>Extracted to a class</h3>
+      <p>Same logic as <code>TaskQueue</code>, but the task list becomes a mutable queue you can <code>pushTask()</code> into at any time, including from inside a running task.</p>
+    </div>
+    <div class="card">
+      <div class="dir">callbacks/task-queue-events.js</div>
+      <h3>Given events</h3>
+      <p><code>extends EventEmitter</code>. Errors become an <code>'error'</code> event and "the queue drained" becomes an <code>'empty'</code> event, so completion no longer has to travel back through callbacks.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ v4 THE QUEUE ════════════════════════════════════════════════ -->
+<section id="v4">
+  <div class="eyebrow"><span class="tag">v4</span> callbacks/06-queued · limited concurrency</div>
+  <h2>Version 4 deletes the callback plumbing entirely</h2>
+  <p>This is the version worth studying twice, because the change isn't "add a queue in front of the same code". The signature changes, and that changes everything downstream:</p>
+
+  <div class="code"><span class="path">callbacks/06-queued/install.js</span><s>export function install(spec, maxDepth, cb)</s>
+<mark class="g">export function install(spec, maxDepth, queue)</mark>
+
+<em>// install() no longer reports completion. At all.</em>
+export function install(spec, maxDepth, queue) {
+  if (installing.has(spec)) { <mark class="g">return</mark> }        <em>// ← no cb, so nothing to defer</em>
+  installing.add(spec)
+
+  <mark class="g">queue.pushTask(done =&gt; {</mark>
+    <mark class="g">installTask(spec, maxDepth, queue, done)</mark>
+  <mark class="g">})</mark>
+}</div>
+
+  <p>With no callback to fire, the <code>process.nextTick</code> guards vanish: there's no Zalgo risk in a function that never calls anyone back. And <code>installDeps</code> loses <em>all</em> of its bookkeeping:</p>
+
+  <div class="grid-2">
+    <figure>
+      <div class="code"><span class="path">v3: installDeps tracks its children</span>function installDeps(manifest, maxDepth, cb) {
+  if (maxDepth === 0) { return process.nextTick(cb) }
+  const deps = getDependencies(manifest)
+  if (deps.length === 0) { return process.nextTick(cb) }
+
+  <mark class="j">let completed = 0</mark>
+  <mark class="j">let hasErrors = false</mark>
+  <mark class="j">function done(err) {</mark>
+    <mark class="j">if (err) { hasErrors = true; return cb(err) }</mark>
+    <mark class="j">if (++completed === deps.length &amp;&amp; !hasErrors) {</mark>
+      <mark class="j">return cb()</mark>
+    <mark class="j">}</mark>
+  <mark class="j">}</mark>
+
+  for (const dep of deps) {
+    install(dep, maxDepth - 1, <mark class="j">done</mark>)
+  }
+}</div>
+      <figcaption>17 lines. Eight of them exist only to answer "are we there yet?"</figcaption>
+    </figure>
+    <figure>
+      <div class="code"><span class="path">v4: installDeps just submits work</span>function installDeps(manifest, maxDepth, queue) {
+  <mark class="g">if (maxDepth === 0) { return }</mark>
+  const deps = getDependencies(manifest)
+  <mark class="g">if (deps.length === 0) { return }</mark>
+
+  for (const dep of deps) {
+    install(dep, maxDepth - 1, <mark class="g">queue</mark>)
+  }
+}</div>
+      <figcaption>9 lines. It returns <code>undefined</code> and forgets the children ever existed.</figcaption>
+    </figure>
+  </div>
+
+  <h3>The move: a task is done when <em>its own</em> page is saved</h3>
+  <p>Look closely at <code>installTask</code>. It calls <code>installDeps(...)</code> and then <code>cb()</code> on the very next line. It does <strong>not</strong> wait for the children:</p>
+
+  <div class="code"><span class="path">callbacks/06-queued/install.js: installTask</span>fetchPackage(spec, storePath, (err, manifest) =&gt; {
+  if (err) { return cb(err) }
+  if (manifest.dependencies) {
+    <mark class="g">installDeps(manifest, maxDepth, queue)</mark>
+    <mark class="g">return cb()</mark>     <em>// ← children are now separate queued tasks, not my problem</em>
+  }
+  return cb()
+})</div>
+
+  <p>In v3 the install was a <strong>tree of nested callbacks</strong>: the root's callback couldn't fire until every descendant's callback had. In v4 it's a <strong>flat pool of sibling tasks</strong> that happen to enqueue more siblings. Nobody waits for anybody.</p>
+
+  <div class="grid-2">
+    <figure>
+      <div class="tree"><span class="ord p">v3</span> completion climbs back up the tree
+
+installDeps(react)                waits for ↓
+  install(loose-envify)            waits for ↓
+    install(js-tokens)       ───── cb()
+    install(object-assign)   ───── cb()
+              <span class="wave">↑ counter hits 2 → loose-envify's cb()</span>
+  install(scheduler)         ───── cb()
+              <span class="wave">↑ counter hits 2 → root's cb()</span></div>
+      <figcaption>Deep, ordered unwinding. Every level needs its own counter.</figcaption>
+    </figure>
+    <figure>
+      <div class="tree"><span class="ord s">v4</span> completion is a property of the queue
+
+queue ← task(react)          done when react is stored
+queue ← task(loose-envify)   done when loose-envify is stored
+queue ← task(scheduler)      done when scheduler is stored
+queue ← task(js-tokens)      done when js-tokens is stored
+queue ← task(object-assign)  done when object-assign is stored
+
+<span class="wave">running === 0 &amp;&amp; queue.length === 0  →  emit('empty')</span></div>
+      <figcaption>Flat and unordered. One counter, inside the queue, for everything.</figcaption>
+    </figure>
+  </div>
+
+  <h3>So how does anyone find out it finished?</h3>
+  <p>They subscribe. Completion stopped being a value threaded through callbacks and became an event on a shared object:</p>
+
+  <div class="code"><span class="path">callbacks/06-queued/install-cli.js</span>const installQueue = new TaskQueue(concurrency)
+<mark class="g">installQueue.on('error', console.error)</mark>
+<mark class="g">installQueue.on('empty', () =&gt; console.log('Install complete'))</mark>
+
+install(spec, maxDepth, installQueue)   <em>// no callback anywhere</em></div>
+
+  <p>Note the error handling change too. In v3 the first failure called <code>cb(err)</code> and aborted that whole subtree. Here a failed task emits <code>'error'</code>, gets logged, and <strong>the install carries on</strong>: one unpublished package no longer kills the run. That's usually what you want from an installer, but it is a real behavioural difference, not just a refactor.</p>
+
+  <h3>Inside the queue</h3>
+  <p>Forty lines, and only three pieces of state, <code>concurrency</code>, <code>running</code>, and the pending array:</p>
+
+  <div class="code"><span class="path">callbacks/task-queue.js</span>export class TaskQueue extends EventEmitter {
+  constructor(concurrency) {
+    super()
+    this.concurrency = concurrency
+    <mark class="g">this.running = 0</mark>
+    <mark class="g">this.queue = []</mark>
+  }
+
+  pushTask(task) {
+    this.queue.push(task)
+    <mark class="j">process.nextTick(this.next.bind(this))</mark>
+    return this                          <em>// chainable: .pushTask(a).pushTask(b)</em>
+  }
+
+  next() {
+    <mark class="j">if (this.running === 0 &amp;&amp; this.queue.length === 0) {</mark>
+      <mark class="j">return this.emit('empty')</mark>
+    <mark class="j">}</mark>
+
+    <mark class="g">while (this.running &lt; this.concurrency &amp;&amp; this.queue.length &gt; 0) {</mark>
+      const task = this.queue.shift()
+      task(err =&gt; {
+        if (err) { this.emit('error', err) }
+        <mark class="g">this.running--</mark>
+        process.nextTick(this.next.bind(this))   <em>// a slot opened: refill it</em>
+      })
+      <mark class="g">this.running++</mark>
+    }
+  }
+}</div>
+
+  <figure class="qdiag">
+    <div class="qgroup">
+      <span class="lbl">pushTask →</span>
+      <div class="qslots">
+        <span class="qbox pend">js-tokens</span>
+        <span class="qbox pend">object-assign</span>
+        <span class="qbox pend">picocolors</span>
+      </div>
+    </div>
+    <div class="qarrow">while running &lt; 2<br><b>──→</b></div>
+    <div class="qgroup">
+      <span class="lbl">running (concurrency 2)</span>
+      <div class="qslots">
+        <span class="qbox run">loose-envify</span>
+        <span class="qbox run">scheduler</span>
+      </div>
+    </div>
+    <div class="qarrow"><b>──→</b><br>done: running--<br>nextTick(next)</div>
+    <div class="qgroup">
+      <span class="lbl">when both empty</span>
+      <div class="qslots"><span class="qbox" style="border-color: var(--join); color: var(--join)">emit('empty')</span></div>
+    </div>
+  </figure>
+
+  <ul>
+    <li><strong>The <code>while</code> loop is the throttle.</strong> It starts tasks until either the slots are full or the queue is dry: that single condition is the entire difference between v3 and v4.</li>
+    <li><strong><code>running++</code> comes <em>after</em> <code>task(...)</code>.</strong> That looks like a bug and isn't: if the task happens to call its callback synchronously, <code>running--</code> would run before <code>running++</code> and the counter would go negative. Ordering it this way keeps the arithmetic correct either way.</li>
+    <li><strong><code>process.nextTick</code> before <code>next()</code>.</strong> It lets the current synchronous block finish: a task pushing three subtasks gets all three into the queue before the scheduler looks again, and it prevents <code>next()</code> recursing into itself and growing the stack.</li>
+    <li><strong><code>'empty'</code> can fire more than once</strong> across a long-running queue: it means "nothing running, nothing pending <em>right now</em>". For the install that's exactly the finish line, because tasks are only ever enqueued by other tasks.</li>
+  </ul>
+
+  <div class="code"><span class="path">running it</span>node install-cli.js https://loige.co 3 5
+                      <em># maxDepth ───┘ │</em>
+                   <em># concurrency ─────┘</em></div>
+</section>
+
+<!-- ══ THREE SHAPES ════════════════════════════════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="tag">choosing</span> all three shapes, side by side</div>
+  <h2>Where each one belongs</h2>
+
+  <div class="cmp-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th style="color: var(--cpu)">Sequential · v2</th>
+          <th style="color: var(--io)">Parallel · v3</th>
+          <th style="color: var(--ok)">Queued · v4</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>In flight at once</th>
+          <td>1</td>
+          <td>Unbounded, and it compounds with depth</td>
+          <td>Exactly <code>concurrency</code>, globally</td>
+        </tr>
+        <tr>
+          <th>Total time</th>
+          <td><b>sum</b> of durations</td>
+          <td><b>max</b> of durations</td>
+          <td>Between the two: <code>sum / concurrency</code>, roughly</td>
+        </tr>
+        <tr>
+          <th>How completion is reported</th>
+          <td><code>cb()</code> from the base case</td>
+          <td><code>cb()</code> when the counter tops out</td>
+          <td><code>'empty'</code> event on the queue</td>
+        </tr>
+        <tr>
+          <th>Where "am I done" lives</th>
+          <td>One index, per level</td>
+          <td>One counter + one flag, per level</td>
+          <td>One counter, in the queue, for the whole run</td>
+        </tr>
+        <tr>
+          <th>Error behaviour</th>
+          <td>First error aborts the chain</td>
+          <td>First error aborts the subtree; siblings keep running invisibly</td>
+          <td><code>'error'</code> event; the run continues</td>
+        </tr>
+        <tr>
+          <th>Coupled to the caller?</th>
+          <td>Yes: callback passed down</td>
+          <td>Yes: callback passed down</td>
+          <td>No: <code>install()</code> returns nothing</td>
+        </tr>
+        <tr>
+          <th>Reach for it when</th>
+          <td>Task <em>N</em> needs task <em>N−1</em>'s result, or order must be reproducible</td>
+          <td>A small, known, fixed set of independent tasks</td>
+          <td>A large or unknown set of independent tasks, i.e. almost always</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="book">There is no fourth pattern hiding here. Every callback-based control flow you'll write is one of these three, or a composition of them, and the entire job is deciding, for each set of tasks, how many are allowed to be in flight.
+  <span class="src">what the callback era is actually teaching</span></p>
+</section>
+
+<!-- ══ TAKEAWAY ════════════════════════════════════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="tag">recall</span> the callback era</div>
+  <h2>What to keep from the callback era</h2>
+  <ul>
+    <li><strong>Callback hell is about indentation, not speed.</strong> Early returns and named functions fix it without changing a single behaviour.</li>
+    <li><strong>Sequential = start the next one inside the previous callback.</strong> The loop variable becomes a function parameter, because parameters survive the stack unwinding and local variables don't.</li>
+    <li><strong>Parallel = start them all, count the finishes.</strong> The shared closure variable is the entire coordination mechanism.</li>
+    <li><strong>"Done" is the thing you design.</strong> Sequential gets it free from a base case; parallel builds it from a counter and defends it with a flag; the queue owns it outright and announces it.</li>
+    <li><strong>Concurrency creates races that sequential code cannot have.</strong> Any check-then-act spanning an async boundary needs a synchronous claim: v3's <code>installing</code> Set, recorded before you yield.</li>
+    <li><strong>Unlimited parallelism is a bug the moment recursion is involved.</strong> The useful number is almost never 1 or ∞; it's <em>n</em>, and <code>TaskQueue</code> is how you spell it.</li>
+    <li><strong>Queuing changes the architecture, not just the pace.</strong> Once completion is an event, <code>install()</code> stops taking a callback, stops counting children, and stops caring who called it. Decoupling is the real payoff: the throttle is almost a side effect.</li>
+    <li><strong>Count the bookkeeping, not the lines.</strong> Of the ~40 lines you just read, roughly half exist only to answer "did it fail?" and "are we there yet?": <code>if (err) return cb(err)</code>, <code>completed</code>, <code>hasErrors</code>, <code>process.nextTick</code>. Hold that number. The next era is about deleting it.</li>
+  </ul>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- ══ ERA 2: PROMISES ═════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section class="era" id="ch5">
+  <div class="num">Era two</div>
+  <h2>Promises: the same three shapes, with the bookkeeping built in</h2>
+  <p>A promise is a callback turned inside out. Instead of you handing a continuation <em>into</em> a function, the function hands you back an object you can attach continuations <em>to</em>. That inversion is small, but it lets the language, rather than your code, own three things the callback era made you write by hand.</p>
+
+  <div class="cards">
+    <div class="card">
+      <h3>Error propagation</h3>
+      <p>A rejection travels down the chain on its own. Every <code>if (err) { return cb(err) }</code> from the callback era becomes nothing at all, plus one <code>.catch()</code> at the very end.</p>
+    </div>
+    <div class="card">
+      <h3>Guaranteed asynchrony</h3>
+      <p><code>.then()</code> always defers to the microtask queue, even on an already-resolved promise. Zalgo is impossible, so every <code>process.nextTick(cb)</code> guard is deleted.</p>
+    </div>
+    <div class="card">
+      <h3>Settle-once semantics</h3>
+      <p>A promise resolves or rejects exactly once, forever. The double-callback bug, and the <code>hasErrors</code> latch that defended against it, cannot occur.</p>
+    </div>
+  </div>
+
+  <h3>The bridge: promisify</h3>
+  <p>The install's <code>utils.js</code> is the only file that really had to change between chapters. Every callback-based function got wrapped:</p>
+
+  <div class="code"><span class="path">promises/promisify.js: the adapter, in nine lines</span>function promisify(callbackBasedFn) {
+  return function promisifiedFn(...args) {
+    return new Promise((resolve, reject) =&gt; {
+      const newArgs = [...args, (err, result) =&gt; {
+        <mark class="j">if (err) { return reject(err) }</mark>
+        <mark class="j">resolve(result)</mark>
+      }]
+      callbackBasedFn(...newArgs)
+    })
+  }
+}</div>
+
+  <p>The error-first convention maps one-to-one onto reject/resolve, which is why a mechanical wrapper works at all. In practice you use <code>util.promisify</code>, or, better, the promise-native APIs directly: <code>node:fs/promises</code> instead of <code>node:fs</code>, and <code>fetch</code> unwrapped.</p>
+
+  <div class="note">
+    <h3>The shapes are unchanged: verify it against the trace</h3>
+    <p>Everything below produces exactly the timelines at the top of this page. If you find yourself thinking "promises made it faster", check which lane you're actually in. <code>Promise.all</code> isn't fast because it's a promise; it's fast because it starts everything before awaiting anything.</p>
+  </div>
+</section>
+
+<!-- ══ P-v2 SEQUENTIAL ═════════════════════════════════════════════ -->
+<section id="p2">
+  <div class="eyebrow"><span class="tag">p·v2</span> promises/01-sequential · one at a time</div>
+  <h2>The <code>for</code> loop comes back, because now it isn't launching anything</h2>
+  <p>The callback era needed <code>iterate(index)</code> because a loop couldn't wait. Here the loop returns, and it works. The trick is that it isn't starting tasks at all. It's <strong>assembling a chain</strong>, synchronously, in a single pass:</p>
+
+  <div class="code"><span class="path">promises/01-sequential/install.js</span>function installDeps(manifest, maxDepth) {
+  <mark class="c">let promise = Promise.resolve()</mark>          <em>// the seed</em>
+  if (maxDepth === 0) { return promise }
+
+  const deps = getDependencies(manifest)
+  <mark class="c">for (const dep of deps) {</mark>
+    <mark class="c">promise = promise.then(() =&gt; install(dep, maxDepth - 1))</mark>
+  <mark class="c">}</mark>
+
+  return promise
+}</div>
+
+  <p>Read the loop body as an accumulator, exactly like <code>reduce</code>: each pass replaces <code>promise</code> with a longer chain. The loop finishes in microseconds, before a single byte has been fetched. What it leaves behind is a linked list of "and then do this".</p>
+
+  <div class="tree">iteration 0   promise = <b>P₀</b>
+iteration 1   promise = P₀.then(→ install(loose-envify))   = <b>P₁</b>
+iteration 2   promise = P₁.then(→ install(prop-types))     = <b>P₂</b>
+iteration 3   promise = P₂.then(→ install(scheduler))      = <b>P₃</b>
+              <span class="wave">↑ each dep can only start once the previous one has settled</span>
+
+return <b>P₃</b>   <em>// settles when the last dep in the chain does</em></div>
+
+  <h3>The arrow function is load-bearing</h3>
+  <p>This is the single most important detail here, and it's four characters wide:</p>
+
+  <div class="grid-2">
+    <figure>
+      <div class="code"><span class="path">correct: lazy</span>promise.then(<mark class="c">() =&gt;</mark> install(dep, d))
+
+<em>// then() stores the function and</em>
+<em>// calls it later, when the previous</em>
+<em>// dep settles. Nothing starts now.</em></div>
+      <figcaption>Deferred call → sequential.</figcaption>
+    </figure>
+    <figure>
+      <div class="code"><span class="path">wrong: eager</span>promise.then(<mark class="w">install(dep, d)</mark>)
+
+<em>// install() is invoked immediately,</em>
+<em>// during the loop. All of them start</em>
+<em>// at once, and then() receives a</em>
+<em>// promise, not a function, so it is</em>
+<em>// ignored entirely.</em></div>
+      <figcaption>Immediate call → accidental parallelism, plus a broken chain.</figcaption>
+    </figure>
+  </div>
+
+  <h3>What disappeared</h3>
+  <p>Compare against the callback version of the same function:</p>
+
+  <div class="cmp-scroll">
+    <table>
+      <thead><tr><th>Callbacks</th><th>Promises</th></tr></thead>
+      <tbody>
+        <tr><td><code>function iterate(index) { … }</code>: a named recursive helper</td><td>A plain <code>for…of</code> loop</td></tr>
+        <tr><td><code>if (index === deps.length) return cb()</code>: an explicit base case</td><td>Gone. The chain ends where the loop ends.</td></tr>
+        <tr><td><code>if (err) { return cb(err) }</code></td><td>Gone. Rejections skip every <code>.then</code> until a <code>.catch</code>.</td></tr>
+        <tr><td><code>return process.nextTick(cb)</code> on both early exits</td><td><code>return Promise.resolve()</code>: already async by spec</td></tr>
+        <tr><td>The <code>cb</code> parameter, threaded through every function</td><td>Gone. The return value <em>is</em> the completion signal.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The chain runs all the way up. <code>writeToStore</code> returns a promise, <code>fetchPackage</code> returns it onward, <code>install</code> returns <code>installDeps</code>'s promise, and the CLI attaches one handler for success and one for failure, for the entire recursive install:</p>
+
+  <div class="code"><span class="path">promises/01-sequential/install-cli.js</span>install(spec, maxDepth)
+  .then(() =&gt; console.log('Downloaded complete'))
+  <mark class="j">.catch(err =&gt; {</mark>          <em>// every failure at every depth lands here</em>
+    <mark class="j">console.error(err)</mark>
+    <mark class="j">process.exit(1)</mark>
+  <mark class="j">})</mark></div>
+
+  <div class="note">
+    <h3>One subtlety in <code>writeToStore</code></h3>
+    <p><code>writeFile</code> resolves with <code>undefined</code>, so the chain would lose the manifest. Hence the extra step: <code>.then(() =&gt; manifest)</code>, a deliberate hop whose only job is to put the value back into the pipeline. Returning a value from a <code>.then</code> callback is how you pass data forward; returning a <em>promise</em> is how you wait for it first.</p>
+  </div>
+</section>
+
+<!-- ══ P-v3 PARALLEL ═══════════════════════════════════════════════ -->
+<section id="p3">
+  <div class="eyebrow"><span class="tag">p·v3</span> promises/02-parallel · unlimited parallel</div>
+  <h2>Parallel is two lines, because <code>Promise.all</code> is the counter <em>and</em> the latch</h2>
+
+  <div class="code"><span class="path">promises/02-parallel/install.js: the entire difference from p·v2</span>function installDeps(manifest, maxDepth) {
+  if (maxDepth === 0) { return Promise.resolve() }
+
+  const deps = getDependencies(manifest)
+  <mark>const promises = deps.map(dep =&gt; install(dep, maxDepth - 1))</mark>
+
+  <mark>return Promise.all(promises)</mark>
+}</div>
+
+  <p>Put the callback era's version beside it. Every one of those eight bookkeeping lines is now a method call:</p>
+
+  <div class="cmp-scroll">
+    <table>
+      <thead><tr><th>What the callback era wrote by hand</th><th>Who does it now</th></tr></thead>
+      <tbody>
+        <tr><td><code>let completed = 0</code> / <code>++completed === deps.length</code></td><td><code>Promise.all</code> counts fulfillments internally.</td></tr>
+        <tr><td><code>let hasErrors = false</code></td><td><strong>Structurally impossible to need.</strong> The returned promise settles once; later rejections have nowhere to go.</td></tr>
+        <tr><td><code>function done(err) { … }</code>: one shared callback</td><td>The array of promises <em>is</em> the shared state.</td></tr>
+        <tr><td><code>return cb(err)</code> on first failure</td><td><code>Promise.all</code> rejects on the first rejection, immediately.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Sequential and parallel, one character apart</h3>
+  <p>Both versions loop over <code>deps</code> and call <code>install</code>. The behaviour flips entirely on <em>when the call happens</em>:</p>
+
+  <div class="grid-2">
+    <figure>
+      <div class="code"><span class="path">p·v2: sequential</span>promise = promise.then(
+  <mark class="c">() =&gt; install(dep, d)</mark>
+)
+
+<em>// .then(fn) SAVES fn.</em>
+<em>// install runs when its turn comes.</em></div>
+      <figcaption>One request in flight. Total = sum.</figcaption>
+    </figure>
+    <figure>
+      <div class="code"><span class="path">p·v3: parallel</span>const promises = deps.map(
+  <mark>dep =&gt; install(dep, d)</mark>
+)
+
+<em>// .map(fn) CALLS fn, right now,</em>
+<em>// once per dep. All in flight before</em>
+<em>// the next line executes.</em></div>
+      <figcaption>All requests in flight. Total = max.</figcaption>
+    </figure>
+  </div>
+
+  <p class="book">A promise is not a task you can start. It is a task that has <em>already</em> started, and a handle for finding out how it went. That's why <code>map</code> is parallel and <code>then</code> is sequential, and why "lazy promise" needs a <a href="#traps">whole custom class</a> to exist.
+  <span class="src">the mental model that makes everything else obvious</span></p>
+
+  <div class="note">
+    <h3>The rest of the family</h3>
+    <p><code>Promise.all</code>: all must succeed, rejects on the first failure. <code>Promise.allSettled</code>: waits for every one and reports each outcome; the right choice when one unpublished package shouldn't sink the whole install. <code>Promise.race</code>: first to <em>settle</em>, win or lose; good for timeouts. <code>Promise.any</code>: first to <em>succeed</em>, rejecting only if all fail. Note that none of them cancel the losers: every request still runs to completion.</p>
+  </div>
+</section>
+
+<!-- ══ P-v4 QUEUED ═════════════════════════════════════════════════ -->
+<section id="p4">
+  <div class="eyebrow"><span class="tag">p·v4</span> promises/03-queued · limited concurrency</div>
+  <h2>The queue keeps its job, and loses its callback</h2>
+  <p>The <code>TaskQueue</code> from the callback era needed each task to accept a <code>done</code> callback and promise to call it. Now a task just returns a promise, and the queue reads completion off it directly:</p>
+
+  <div class="grid-2">
+    <figure>
+      <div class="code"><span class="path">callbacks · TaskQueue.next()</span>const task = this.queue.shift()
+task(<mark class="j">err =&gt; {</mark>
+  <mark class="j">if (err) { this.emit('error', err) }</mark>
+  <mark class="j">this.running--</mark>
+  <mark class="j">process.nextTick(this.next.bind(this))</mark>
+<mark class="j">}</mark>)
+this.running++</div>
+      <figcaption>The queue hands out a callback and trusts the task to call it exactly once.</figcaption>
+    </figure>
+    <figure>
+      <div class="code"><span class="path">promises · TaskQueue.next()</span>const task = this.queue.shift()
+task()
+  <mark class="g">.catch(err =&gt; { this.emit('error', err) })</mark>
+  <mark class="g">.finally(() =&gt; {</mark>
+    <mark class="g">this.running--</mark>
+    <mark class="g">this.next()</mark>
+  <mark class="g">})</mark>
+this.running++</div>
+      <figcaption>The task's own promise is the signal. Nothing is handed out.</figcaption>
+    </figure>
+  </div>
+
+  <ul>
+    <li><strong><code>.finally()</code> is exactly the right verb.</strong> "Free the slot whichever way this went" is a single concept, and it now reads as one. In the callback version that logic had to be duplicated mentally across the error and success paths of every task.</li>
+    <li><strong><code>.catch()</code> before <code>.finally()</code> matters.</strong> The <code>catch</code> handles the rejection and returns a fulfilled promise, so <code>finally</code> runs on a settled chain and the rejection never escapes as an unhandled promise rejection.</li>
+    <li><strong><code>this.next()</code> is called directly now</strong>: no <code>process.nextTick</code> wrapper. <code>.finally()</code> callbacks already run as microtasks, so the deferral the callback era had to add by hand is now free.</li>
+    <li><strong><code>pushTask</code> still uses <code>process.nextTick</code></strong>, though, and that's what lets <code>install-cli.js</code> push the root task <em>before</em> attaching its <code>'empty'</code> listener without missing the event.</li>
+  </ul>
+
+  <h3>Where the dedupe check moved</h3>
+  <p>The callback era's <code>installing</code> guard sat at the top of <code>install()</code>. Here it sits in <code>installDeps</code>, one step earlier, the package is claimed before it's ever enqueued:</p>
+
+  <div class="code"><span class="path">promises/03-queued/install.js</span>function installDeps(manifest, maxDepth, queue) {
+  if (maxDepth === 0) { return }
+  const deps = getDependencies(manifest)
+
+  for (const dep of deps) {
+    <mark class="g">if (!installing.has(dep)) {</mark>
+      <mark class="g">queue.pushTask(() =&gt; install(dep, maxDepth - 1, queue))</mark>
+      <mark class="g">installing.add(dep)</mark>
+    <mark class="g">}</mark>
+  }
+}                    <em>// returns undefined: fire and forget</em></div>
+
+  <p>Same principle as the callback era: <code>has</code> and <code>add</code> are both synchronous, in the same uninterrupted block, so no second caller can slip between them. And note the lazy arrow again: <code>() =&gt; install(…)</code>, because the queue must decide <em>when</em> the task runs. Passing <code>install(dep, …)</code> directly would start every request instantly and defeat the whole queue.</p>
+
+  <div class="note">
+    <h3>Worth noticing: the root package isn't claimed</h3>
+    <p>In the callback era's v4, <code>install()</code> itself did <code>installing.add(spec)</code>, so every package including the root was registered. Here the CLI pushes the root directly with <code>queue.pushTask(() =&gt; install(spec, maxDepth, queue))</code> and the guard only runs over <em>deps</em>. A page linking back to the root will therefore enqueue it a second time. It's harmless: the package is now in the store, so the second pass just reads its manifest and finds every dependency already claimed, but it is a real asymmetry between the two versions, not a simplification.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- ══ ERA 3: ASYNC / AWAIT ════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section class="era" id="a2">
+  <div class="num">Era three</div>
+  <h2>Async/await: the loop the callback era couldn't write</h2>
+  <p>Everything so far has been a workaround for one fact: <strong>the call stack unwinds before your result arrives</strong>. An <code>async</code> function is the language finally fixing that directly: at every <code>await</code> the function suspends, its stack frame is preserved, and it resumes into that same frame when the promise settles.</p>
+  <p>Which means a loop variable can live on the stack again. The callback era's <code>iterate(index)</code> recursion and the promise era's <code>promise = promise.then(…)</code> accumulator both collapse into the thing you wanted to write in the first place:</p>
+
+  <div class="code"><span class="path">async-await/01-sequential/install.js: sequential, in full</span>async function installDeps(manifest, maxDepth) {
+  if (maxDepth === 0) { return }
+
+  const deps = getDependencies(manifest)
+  <mark class="c">for (const dep of deps) {</mark>
+    <mark class="c">await install(dep, maxDepth - 1)</mark>
+  <mark class="c">}</mark>
+}</div>
+
+  <p>Three lines of body. Compare the three eras of exactly this function:</p>
+
+  <div class="cmp-scroll">
+    <table>
+      <thead><tr><th>Era</th><th>Sequential iteration, minimally</th><th>Lines</th></tr></thead>
+      <tbody>
+        <tr><th>Callbacks</th><td><code>function iterate(i) { if (i === n) return cb(); install(deps[i], d, err =&gt; { if (err) return cb(err); iterate(i + 1) }) } iterate(0)</code></td><td>8</td></tr>
+        <tr><th>Promises</th><td><code>let p = Promise.resolve(); for (const l of deps) { p = p.then(() =&gt; install(l, d)) } return p</code></td><td>4</td></tr>
+        <tr><th>Async/await</th><td><code>for (const l of deps) { await install(l, d) }</code></td><td>3</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The pyramid, finally flat</h3>
+  <p>The bigger win is in <code>install()</code> itself. The callback era's version branched: <em>already in the store</em> read it and install, <em>otherwise</em> fetchPackage it and install, so the call to <code>installDeps</code> appeared twice, at the bottom of two separate nested callbacks. With <code>await</code>, both branches just assign to a local variable and fall through to one shared ending:</p>
+
+  <div class="code"><span class="path">async-await/01-sequential/install.js</span>export async function install(spec, maxDepth) {
+  const storePath = storePathFor(spec)
+
+  <mark class="c">let content</mark>
+  if (!(<mark class="c">await inStore(storePath)</mark>)) {
+    content = <mark class="c">await fetchPackage(spec, storePath)</mark>       <em>// not in the store: fetch it</em>
+  }
+
+  if (!manifest.dependencies) { return }      <em>// a leaf package</em>
+
+  if (!manifest) {
+    manifest = <mark class="c">await readManifest(storePath)</mark>            <em>// was in the store: load it</em>
+  }
+
+  return installDeps(manifest, maxDepth)
+}</div>
+
+  <p>Maximum nesting depth: <strong>one</strong>. Against the version this page opened with: depth nine, with a five-line tail of closing brackets. That is the entire argument for the new syntax in a single screenshot. Read top to bottom, it's just a description of the algorithm.</p>
+
+  <div class="grid-2">
+    <figure>
+      <div class="code"><span class="path">v1 · callbacks/01-nested: the tail</span>              }
+            })
+          }
+        })
+      }
+    })
+  })
+}</div>
+      <figcaption>Eight closing lines carrying zero information.</figcaption>
+    </figure>
+    <figure>
+      <div class="code"><span class="path">async-await/01-sequential: the tail</span>  return installDeps(manifest, maxDepth)
+}</div>
+      <figcaption>One statement and a brace.</figcaption>
+    </figure>
+  </div>
+
+  <h3>Errors become ordinary</h3>
+  <p>Because <code>await</code> throws on rejection, a single <code>try/catch</code> now covers both synchronous throws and asynchronous failures, and the CLI can use top-level <code>await</code>, no wrapper function at all:</p>
+
+  <div class="code"><span class="path">async-await/01-sequential/install-cli.js</span><mark class="c">try {</mark>
+  <mark class="c">await install(spec, maxDepth)</mark>         <em>// top-level await, in an ES module</em>
+  console.log('Downloaded complete')
+<mark class="c">} catch (err) {</mark>
+  console.error(err)
+  process.exit(1)
+<mark class="c">}</mark></div>
+</section>
+
+<!-- ══ AA-v3 PARALLEL ══════════════════════════════════════════════ -->
+<section id="a3">
+  <div class="eyebrow"><span class="tag">a·v3</span> async-await/02-parallel · unlimited parallel</div>
+  <h2>Async/await gives you sequencing. It does not give you concurrency.</h2>
+  <p>This is where most real-world async code goes wrong, so it's worth stating flatly: <strong><code>await</code> inside a loop is the sequential pattern.</strong> It is not a slower parallel: it is a different lane on the trace at the top of this page. To go parallel you still need <code>Promise.all</code>, and the v3 file proves it by being byte-identical to the promise version:</p>
+
+  <div class="code"><span class="path">async-await/02-parallel/install.js: identical to promises/02-parallel</span>async function installDeps(manifest, maxDepth) {
+  if (maxDepth === 0) { return }
+
+  const deps = getDependencies(manifest)
+  <mark>const promises = deps.map(dep =&gt; install(dep, maxDepth - 1))</mark>
+
+  <mark>return Promise.all(promises)</mark>
+}</div>
+
+  <p>The <code>async</code> keyword on that function now buys nothing: there's no <code>await</code> in the body. It's kept for signature consistency; deleting it would behave the same.</p>
+
+  <h3>The mistake, side by side</h3>
+
+  <div class="grid-2">
+    <figure>
+      <div class="code"><span class="path">accidentally sequential</span>for (const dep of deps) {
+  <mark class="w">await</mark> install(dep, d)
+}
+<em>// Each iteration suspends until the</em>
+<em>// previous request finishes.</em>
+<em>// 5 deps × 400ms = 2000ms</em></div>
+      <figcaption>Looks concurrent. Is not.</figcaption>
+    </figure>
+    <figure>
+      <div class="code"><span class="path">actually parallel</span>const ps = deps.map(l =&gt; install(l, d))
+<mark>await</mark> Promise.all(ps)
+
+<em>// Every request starts during map().</em>
+<em>// The await is on the collection.</em>
+<em>// 5 deps × 400ms = 400ms</em></div>
+      <figcaption>Start everything, then await once.</figcaption>
+    </figure>
+  </div>
+
+  <p><strong>The rule that catches it every time:</strong> ask where the function calls happen relative to the <code>await</code>. If <code>install()</code> is <em>invoked</em> after an <code>await</code> that depends on the previous iteration, you are sequential. If every invocation happens before any awaiting, you are parallel.</p>
+</section>
+
+<!-- ══ AA-v4 QUEUED ════════════════════════════════════════════════ -->
+<section id="a4">
+  <div class="eyebrow"><span class="tag">a·v4</span> async-await/03-queued · limited concurrency</div>
+  <h2>Turning the event back into something you can await</h2>
+  <p>The queue is unchanged from p·v4: <code>task().catch().finally()</code>, same three fields. Two details differ, and both are worth the detour.</p>
+
+  <h3>1. Not everything needs to be async</h3>
+  <div class="code"><span class="path">async-await/03-queued/install.js</span><mark class="g">function</mark> installDeps(manifest, maxDepth, queue) {   <em>// ← no `async`</em>
+  if (maxDepth === 0) { return }
+
+  const deps = getDependencies(manifest)
+  for (const dep of deps) {
+    if (!installing.has(dep)) {
+      queue.pushTask(() =&gt; install(dep, maxDepth - 1, queue))
+      installing.add(dep)
+    }
+  }
+}</div>
+  <p>It enqueues and returns. There is nothing to await, so marking it <code>async</code> would only wrap <code>undefined</code> in a promise and imply a completion signal that doesn't exist. The <code>async</code> keyword is a claim about your return value: don't make it idly.</p>
+
+  <h3>2. <code>await once(queue, 'empty')</code></h3>
+  <p>The CLI closes the loop between the three eras. Completion left the callback in era one and became an event; here the event becomes a promise again, so the program can be read straight down:</p>
+
+  <div class="code"><span class="path">async-await/03-queued/install-cli.js</span>import { once } from 'node:events'
+
+const queue = new TaskQueue(concurrency)
+queue.pushTask(() =&gt; install(spec, maxDepth, queue))
+<mark class="w">queue.on('taskError', console.error)</mark>
+
+<mark class="g">await once(queue, 'empty')</mark>
+console.log('Install complete')</div>
+
+  <div class="note">
+    <h3>Why <code>'error'</code> had to be renamed to <code>'taskError'</code></h3>
+    <p>Two separate special cases collide here. First, <code>EventEmitter</code> treats <code>'error'</code> specially: emitting it with no listener attached <em>throws</em>. Second, and this is the one that bites, <code>events.once()</code> also attaches its own <code>'error'</code> listener, and will <strong>reject</strong> the promise you're awaiting if that event fires. So with an <code>'error'</code>-named event, a single failed fetchPackage would reject <code>await once(queue, 'empty')</code> and crash the CLI instead of just logging a dead dep. Renaming the event sidesteps both behaviours. It's a one-word change that only makes sense once you know both rules.</p>
+  </div>
+
+  <p>Note also that <code>pushTask</code> is called <em>before</em> the listeners are attached, and it still works, because <code>pushTask</code> defers <code>next()</code> with <code>process.nextTick</code>, so the current synchronous block finishes (registering both listeners) before the queue can possibly emit anything. The Zalgo discipline from era one is still quietly holding the design together.</p>
+</section>
+
+<!-- ══ TRAPS ═══════════════════════════════════════════════════════ -->
+<section id="traps">
+  <div class="eyebrow"><span class="tag">traps</span> the failure modes the new syntax introduces</div>
+  <h2>Three ways the new syntax bites back</h2>
+  <p>Promises remove whole categories of bug, and add a few of their own. All three of these are in the chapter's example folders, and all three are the kind you ship without noticing.</p>
+
+  <h3>1. <code>return</code> vs <code>return await</code> inside <code>try</code></h3>
+  <div class="grid-2">
+    <figure>
+      <div class="code"><span class="path">traps/return-await.js</span>async function errorNotCaught() {
+  try {
+    <mark class="w">return delayError(1000)</mark>
+  } catch (err) {
+    console.error('caught here')   <em>// never runs</em>
+  }
+}</div>
+      <figcaption>The function returns the pending promise and leaves the <code>try</code> block. There is nothing left to catch when it rejects a second later: the caller's <code>.catch</code> gets it.</figcaption>
+    </figure>
+    <figure>
+      <div class="code"><span class="path">traps/return-await.js</span>async function errorCaught() {
+  try {
+    <mark class="g">return await delayError(1000)</mark>
+  } catch (err) {
+    console.error('caught here')   <em>// runs</em>
+  }
+}</div>
+      <figcaption>The <code>await</code> keeps the function suspended <em>inside</em> the <code>try</code>, so the rejection becomes a throw the <code>catch</code> can see.</figcaption>
+    </figure>
+  </div>
+  <p>Outside a <code>try/catch</code> the two are equivalent, which is why linters used to flag <code>return await</code> as redundant. Inside one, they do completely different things.</p>
+
+  <h3>2. Recursion that leaked nothing with callbacks leaks memory here</h3>
+  <p>The callback era made a point of it: <code>iterate(index + 1)</code> inside a callback doesn't grow the stack, because the event loop invokes callbacks on a fresh one. Recursion was free. With promises it isn't: <strong>returning</strong> the recursive call chains the promises together, and a chain that never ends can never be garbage collected:</p>
+
+  <div class="grid-2">
+    <figure>
+      <div class="code"><span class="path">traps/recursion-leak.js: leaks</span>function leakingLoop() {
+  return delay(1).then(() =&gt; {
+    console.log(`Tick ${Date.now()}`)
+    <mark class="w">return leakingLoop()</mark>
+  })
+}</div>
+      <figcaption>Every iteration adds a promise that is waiting on the next one. None can ever settle, so none can ever be freed.</figcaption>
+    </figure>
+    <figure>
+      <div class="code"><span class="path">the same loop, without the leak</span>function nonLeakingLoop() {
+  delay(1).then(() =&gt; {
+    console.log(`Tick ${Date.now()}`)
+    <mark class="g">nonLeakingLoop()</mark>          <em>// no return</em>
+  })
+}</div>
+      <figcaption>Each promise settles and is collected. The cost: the caller can no longer be told when, or whether, the loop ended.</figcaption>
+    </figure>
+  </div>
+
+  <p>The same trap exists in async form: <code>return leakingLoopAsync()</code> at the end of an <code>async</code> function chains identically. And here the third era wins outright, because it can express an unbounded loop with no recursion at all:</p>
+
+  <div class="code"><span class="path">traps/recursion-leak.js: the version with no trade-off</span>async function nonLeakingLoopAsync() {
+  <mark class="g">while (true) {</mark>
+    <mark class="g">await delay(1)</mark>
+    console.log(`Tick ${Date.now()}`)
+  <mark class="g">}</mark>
+}</div>
+  <p>One frame, reused forever. No chain accumulates, and errors still propagate normally, which is exactly what the callback-era workaround (a manual <code>internalLoop()</code> wrapped in <code>new Promise</code>, rejecting on error) had to build by hand.</p>
+
+  <h3>3. A promise starts the moment it is created</h3>
+  <p>There is no such thing as a promise you have made but not started. <code>const p = fetch(spec)</code> has already sent the request; <code>await</code> only decides when you look at the result. That's why the queue and the sequential chain both take <code>() =&gt; install(…)</code> rather than <code>install(…)</code>, and why a genuinely lazy promise needs a custom <code>LazyPromise</code> subclass to defer the executor until someone calls <code>.then</code>. If you want a task you can hold and start later, the thing you need is a <em>function</em> that returns a promise, not a promise.</p>
+</section>
+
+<!-- ══ FINAL TAKEAWAY ══════════════════════════════════════════════ -->
+<section class="era">
+  <div class="num">All three eras · in one page</div>
+  <h2>What to keep</h2>
+
+  <ul>
+    <li><strong>Three shapes, three syntaxes, nine cells.</strong> The matrix at the top of this page is the whole of it. Every async control flow you write is one of those cells or a composition of them.</li>
+    <li><strong>The shape decides the runtime; the syntax decides the readability.</strong> Rewriting a sequential install in <code>async/await</code> makes it shorter, not faster. Only moving from one column of the matrix to another changes the trace.</li>
+    <li><strong>Promises delete the bookkeeping, not the thinking.</strong> Error propagation, guaranteed asynchrony, and settle-once semantics come free, so <code>if (err) return cb(err)</code>, <code>process.nextTick(cb)</code>, and <code>hasErrors</code> all vanish. Deciding <em>how many things run at once</em> is still your job, in every era.</li>
+    <li><strong><code>then</code> is lazy, <code>map</code> is eager.</strong> That single distinction is the difference between sequential and parallel in promise-land, and the reason a queue must be handed <code>() =&gt; task()</code> and never <code>task()</code>.</li>
+    <li><strong><code>await</code> in a loop is sequential.</strong> If you meant to fan out, start everything first and await the collection. It never throws and never logs: it shows up only as a latency number nobody can explain.</li>
+    <li><strong>Concurrency creates races.</strong> Any check-then-act spanning an async boundary needs a synchronous claim before you yield: the <code>installing</code> Set survives unchanged through all three eras because the hazard is structural, not syntactic.</li>
+    <li><strong>Unlimited is not a concurrency setting.</strong> The useful answer is almost never 1 or ∞. Every era ends at the same place: a <code>TaskQueue</code> with a number in it.</li>
+    <li><strong>Recursion changed cost between eras.</strong> Free in callbacks, a memory leak in promises, unnecessary in <code>async/await</code>, where a plain <code>while</code> loop finally does the job.</li>
+  </ul>
+
+  <p class="book">The installer is the same program in every one of these files. What eleven rewrites actually teach is that you have three vocabularies for saying the same three things, and that picking the right shape matters more than picking the newest syntax.
+  <span class="src">eleven rewrites, one idea</span></p>
+</section>
+
+</main>
+
+<footer>
+  The three-shapes taxonomy is from <b>Node.js Design Patterns, 4th ed.</b>,
+  ch. 4 (Asynchronous Control Flow Patterns with Callbacks) and ch. 5 (…with Promises and Async/Await).
+  The installer, the code and the prose here are my own.<br><br>
+  <b>callbacks</b> &nbsp;01-nested · 02-flattened · 03-sequential · 04-parallel · 05-deduped · 06-queued · task-queue<br>
+  <b>promises</b> &nbsp;promisify · 01-sequential · 02-parallel · 03-queued<br>
+  <b>async-await</b> &nbsp;01-sequential · 02-parallel · 03-queued<br>
+  <b>traps</b> &nbsp;return-await · recursion-leak<br><br>
+  Written by <a href="/">Nabeel Ahmed Khan</a> · <a href="/projects">engineering case studies</a>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ── the pyramid figure: real v1 source, drawn by indent depth ───── */
+  var PYRAMID = [
+    [0, "export function install(spec, cb) {"],
+    [1, "const storePath = storePathFor(spec)"],
+    [1, "inStore(storePath, (err, alreadyExists) => {"],
+    [2, "if (err) {"],
+    [3, "cb(err)"],
+    [2, "} else if (alreadyExists) {"],
+    [3, "cb(null, storePath, false)"],
+    [2, "} else {"],
+    [3, "get(spec, (err, content) => {"],
+    [4, "if (err) {"],
+    [5, "cb(err)"],
+    [4, "} else {"],
+    [5, "mkdirp(dirname(storePath), err => {"],
+    [6, "if (err) {"],
+    [7, "cb(err)"],
+    [6, "} else {"],
+    [7, "writeFile(storePath, content, err => {"],
+    [8, "if (err) {"],
+    [9, "cb(err)"],
+    [8, "} else {"],
+    [9, "cb(null, storePath, true)"],
+    [8, "}"],
+    [7, "})"],
+    [6, "}"],
+    [5, "})"],
+    [4, "}"],
+    [3, "})"],
+    [2, "}"],
+    [1, "})"],
+    [0, "}"]
+  ];
+
+  var pyr = document.getElementById('pyramid');
+  if (pyr) {
+    var frag = document.createDocumentFragment();
+    PYRAMID.forEach(function (row) {
+      var depth = row[0], text = row[1];
+      var el = document.createElement('div');
+      el.className = 'pyr-row' + (depth >= 6 ? ' deep' : '');
+      var bar = document.createElement('div');
+      bar.className = 'pyr-bar';
+      var fill = document.createElement('i');
+      fill.style.width = (depth * 12 + 2) + 'px';
+      fill.style.opacity = String(0.28 + depth * 0.075);
+      bar.appendChild(fill);
+      var code = document.createElement('div');
+      code.className = 'pyr-code';
+      code.textContent = new Array(depth + 1).join('  ') + text;
+      el.appendChild(bar);
+      el.appendChild(code);
+      frag.appendChild(el);
+    });
+    pyr.insertBefore(frag, pyr.firstChild);
+  }
+
+  /* ── the install trace ─────────────────────────────────────────────── */
+  var ROOT_MS = 300;
+  var DEPS = [
+    ['loose-envify',  400],
+    ['scheduler',     250],
+    ['prop-types',    600],
+    ['js-tokens',     350],
+    ['object-assign', 500],
+    ['picocolors',    200],
+    ['csstype',       450],
+    ['semver',        300],
+    ['lru-cache',     380],
+    ['ms',            180],
+    ['debug',         520],
+    ['yallist',       240],
+    ['minipass',      430],
+    ['glob',          610],
+    ['brace-expansion', 290],
+    ['balanced-match', 210],
+    ['chownr',        330],
+    ['fs-minipass',   470],
+    ['minizlib',      360],
+    ['mkdirp',        260]
+  ];
+
+  var slider   = document.getElementById('linkCount');
+  var linkOut  = document.getElementById('linkOut');
+  var concEl   = document.getElementById('conc');
+  var concOut  = document.getElementById('concOut');
+  var cLabel   = document.getElementById('cLabel');
+  var runBtn   = document.getElementById('runBtn');
+  var ticksEl  = document.getElementById('axisTicks');
+  var verdict  = document.getElementById('verdict');
+
+  var LANES = [
+    { key: 'seq', rows: document.getElementById('rowsSeq'), clock: document.getElementById('clockSeq') },
+    { key: 'par', rows: document.getElementById('rowsPar'), clock: document.getElementById('clockPar') },
+    { key: 'lim', rows: document.getElementById('rowsLim'), clock: document.getElementById('clockLim') }
+  ];
+
+  var state = null;
+  var rafId = null;
+
+  function build(n, c) {
+    var picks = DEPS.slice(0, n);
+    var root = { label: 'install react', start: 0, dur: ROOT_MS, wait: 0 };
+
+    // ── sequential: strictly one after the other
+    var seq = [Object.assign({}, root)];
+    var t = ROOT_MS;
+    picks.forEach(function (p) {
+      seq.push({ label: 'fetch ' + p[0], start: t, dur: p[1], wait: 0 });
+      t += p[1];
+    });
+    var seqTotal = t;
+
+    // ── parallel: every child starts the instant the root lands
+    var par = [Object.assign({}, root)];
+    var longest = 0;
+    picks.forEach(function (p) {
+      par.push({ label: 'fetch ' + p[0], start: ROOT_MS, dur: p[1], wait: 0 });
+      if (p[1] > longest) longest = p[1];
+    });
+    var parTotal = ROOT_MS + longest;
+
+    // ── queued: greedy fill of `c` slots, FIFO, exactly what TaskQueue.next() does
+    var lim = [Object.assign({}, root)];
+    var slots = [];
+    for (var i = 0; i < c; i++) slots.push(ROOT_MS);
+    picks.forEach(function (p) {
+      var pick = 0;
+      for (var j = 1; j < slots.length; j++) if (slots[j] < slots[pick]) pick = j;
+      var start = slots[pick];
+      lim.push({ label: 'fetch ' + p[0], start: start, dur: p[1], wait: start - ROOT_MS });
+      slots[pick] = start + p[1];
+    });
+    var limTotal = slots.reduce(function (a, b) { return Math.max(a, b); }, ROOT_MS);
+
+    state = {
+      seq: seq, par: par, lim: lim,
+      totals: { seq: seqTotal, par: parTotal, lim: limTotal },
+      n: n, c: c,
+      scale: seqTotal * 1.06   // headroom on the right for the cb() marker
+    };
+    render();
+  }
+
+  function renderLane(lane, tasks, total) {
+    lane.rows.textContent = '';
+    var scale = state.scale;
+    var heads = [];
+
+    tasks.forEach(function (task) {
+      var row = document.createElement('div');
+      row.className = 'row';
+
+      var label = document.createElement('div');
+      label.className = 'row-label';
+      label.textContent = task.label;
+
+      var track = document.createElement('div');
+      track.className = 'track';
+
+      // time spent sitting in the queue, before a slot opened
+      if (task.wait > 0) {
+        var wait = document.createElement('div');
+        wait.className = 'wait';
+        wait.style.left = (ROOT_MS / scale * 100) + '%';
+        wait.style.width = (task.wait / scale * 100) + '%';
+        wait.title = 'queued for ' + task.wait + ' ms';
+        track.appendChild(wait);
+      }
+
+      var bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.setAttribute('data-c', lane.key);
+      bar.style.left = (task.start / scale * 100) + '%';
+      bar.style.width = (task.dur / scale * 100) + '%';
+      var fill = document.createElement('i');
+      bar.appendChild(fill);
+      track.appendChild(bar);
+
+      var head = document.createElement('div');
+      head.className = 'playhead';
+      head.style.left = '0%';
+      head.style.display = 'none';
+      track.appendChild(head);
+      heads.push(head);
+
+      task._fill = fill;
+      task._track = track;
+
+      row.appendChild(label);
+      row.appendChild(track);
+      lane.rows.appendChild(row);
+    });
+
+    var flag = document.createElement('div');
+    flag.className = 'flag';
+    flag.style.left = (total / scale * 100) + '%';
+    flag.setAttribute('data-t', lane.key === 'lim' ? "'empty'" : 'cb()');
+    tasks[tasks.length - 1]._track.appendChild(flag);
+
+    lane._heads = heads;
+  }
+
+  function renderTicks() {
+    ticksEl.textContent = '';
+    var span = state.totals.seq;
+    var step = span > 2600 ? 1000 : 500;
+    for (var ms = 0; ms <= span; ms += step) {
+      var s = document.createElement('span');
+      s.style.left = (ms / state.scale * 100) + '%';
+      s.textContent = ms === 0 ? '0' : (ms / 1000) + 's';
+      ticksEl.appendChild(s);
+    }
+  }
+
+  function render() {
+    LANES.forEach(function (lane) {
+      renderLane(lane, state[lane.key], state.totals[lane.key]);
+    });
+    renderTicks();
+    setClocks(Infinity);
+    setVerdict();
+    setFills(Infinity);
+  }
+
+  function setClocks(elapsed) {
+    LANES.forEach(function (lane) {
+      var total = state.totals[lane.key];
+      lane.clock.innerHTML = '<b>' + Math.round(Math.min(elapsed, total)) + '</b> ms';
+    });
+  }
+
+  function setVerdict() {
+    var T = state.totals;
+    var c = Math.min(state.c, state.n);
+    verdict.innerHTML =
+      '<span>' + state.n + ' deps · sum <b>' + T.seq + ' ms</b> · max <b>' + T.par + ' ms</b> · queued <b>' + T.lim + ' ms</b></span>' +
+      '<span>vs sequential: parallel <b>' + (T.seq / T.par).toFixed(2) + '×</b>, queued <b>' + (T.seq / T.lim).toFixed(2) + '×</b></span>' +
+      '<span>peak in flight: <b>1</b> / <b>' + state.n + '</b> / <b>' + c + '</b></span>';
+  }
+
+  function setFills(elapsed) {
+    LANES.forEach(function (lane) {
+      state[lane.key].forEach(function (task) {
+        var done = Math.min(Math.max(elapsed - task.start, 0), task.dur);
+        task._fill.style.width = (task.dur === 0 ? 100 : (done / task.dur) * 100) + '%';
+      });
+    });
+  }
+
+  function showHeads(lane, on) {
+    for (var i = 0; i < lane._heads.length; i++) lane._heads[i].style.display = on ? 'block' : 'none';
+  }
+  function moveHeads(lane, pct) {
+    for (var i = 0; i < lane._heads.length; i++) lane._heads[i].style.left = pct + '%';
+  }
+
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function run() {
+    if (rafId) cancelAnimationFrame(rafId);
+    if (reduceMotion) { setFills(Infinity); setClocks(Infinity); return; }
+
+    runBtn.disabled = true;
+    slider.disabled = true;
+    concEl.disabled = true;
+    setFills(0);
+    setClocks(0);
+    LANES.forEach(function (lane) { showHeads(lane, true); });
+
+    var SPEED = 1.6;                 // simulated ms per real ms, watchable
+    var startedAt = performance.now();
+    var scale = state.scale;
+    var slowest = state.totals.seq;
+
+    function frame(now) {
+      var elapsed = (now - startedAt) * SPEED;
+      setFills(elapsed);
+      setClocks(elapsed);
+      LANES.forEach(function (lane) {
+        var total = state.totals[lane.key];
+        moveHeads(lane, Math.min(elapsed, total) / scale * 100);
+        if (elapsed >= total) showHeads(lane, false);
+      });
+
+      if (elapsed < slowest) {
+        rafId = requestAnimationFrame(frame);
+      } else {
+        rafId = null;
+        setFills(Infinity);
+        setClocks(Infinity);
+        runBtn.disabled = false;
+        slider.disabled = false;
+        concEl.disabled = false;
+      }
+    }
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function rebuild() {
+    if (rafId) return;
+    linkOut.textContent = slider.value;
+    concOut.textContent = concEl.value;
+    cLabel.textContent = concEl.value;
+    build(parseInt(slider.value, 10), parseInt(concEl.value, 10));
+  }
+
+  slider.addEventListener('input', rebuild);
+  concEl.addEventListener('input', rebuild);
+  runBtn.addEventListener('click', run);
+
+  rebuild();
+})();
+</script>
+
+</body>
+</html>
